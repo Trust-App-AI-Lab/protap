@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.12.2 (sftp://shuoyan@10.120.17.114:22/home/shuoyan/anaconda3/envs/miniseal/bin/python)" project-jdk-type="Python SDK" />
+  <component name="UnattendedHostPersistenceState">
+    <option name="openedFilesInfos">
+      <list>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="4559" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/SE3Transformer.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="5119" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/test_SE3Transformer.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="276" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/QM9.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="241" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/equivariant_attention/modules.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="1719" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/equivariant_attention/fibers.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="0" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/equivariant_attention/from_se3cnn/cache_file.py" />
+        </OpenedFileInfo>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="0" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/prot_learn/models/se3/equivariant_attention/from_se3cnn/utils_steerable.py" />
+        </OpenedFileInfo>
+      </list>
+    </option>
+  </component>
+</project>
