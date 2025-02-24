@@ -110,9 +110,11 @@ class GlobalLinearAttention(nn.Module):
 
 class EGNN(nn.Module):
     """
-    dim: 
-    edge_dim: 
-    m_dim:
+    dim: The dimension of the input. (Node dim)
+    
+    edge_dim: The dimension of the edge, e.g., 4.
+    
+    m_dim: The dimension of the hidden model. (Model dim)
     
     """
     def __init__(
@@ -144,6 +146,7 @@ class EGNN(nn.Module):
         edge_input_dim = (fourier_features * 2) + (dim * 2) + edge_dim + 1
         dropout = nn.Dropout(dropout) if dropout > 0 else nn.Identity()
 
+        # in: edge_dim, out: m_dim.
         self.edge_mlp = nn.Sequential(
             nn.Linear(edge_input_dim, edge_input_dim * 2),
             dropout,
@@ -162,6 +165,8 @@ class EGNN(nn.Module):
 
         self.m_pool_method = m_pool_method
 
+        # Eq.(6)
+        # in: dim + m_dim, out: dim.
         self.node_mlp = nn.Sequential(
             nn.Linear(dim + m_dim, dim * 2),
             dropout,
@@ -169,6 +174,7 @@ class EGNN(nn.Module):
             nn.Linear(dim * 2, dim),
         ) if update_feats else None
 
+        # in: m_dim, out: 1.
         self.coors_mlp = nn.Sequential(
             nn.Linear(m_dim, m_dim * 4),
             dropout,
