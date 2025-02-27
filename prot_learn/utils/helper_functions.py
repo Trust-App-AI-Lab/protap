@@ -45,11 +45,3 @@ def embedd_token(x, dims, layers):
         stop_concat = x.shape[-1]
         
     return x
-
-# swish activation fallback
-
-# class Swish_(nn.Module):
-#     def forward(self, x):
-#         return x * x.sigmoid()
-
-# SiLU = nn.SiLU if hasattr(nn, 'SiLU') else Swish_

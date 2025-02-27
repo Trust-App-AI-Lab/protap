@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from utils.helper_functions import *
+from prot_learn.utils.helper_functions import *
 # helper classes
 
 # this follows the same strategy for normalization as done in SE3 Transformers
@@ -174,6 +174,7 @@ class EGNN(nn.Module):
             nn.Linear(dim * 2, dim),
         ) if update_feats else None
 
+        # Eq.(4), psi_x.
         # in: m_dim, out: 1.
         self.coors_mlp = nn.Sequential(
             nn.Linear(m_dim, m_dim * 4),
