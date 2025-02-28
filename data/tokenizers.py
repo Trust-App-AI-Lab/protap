@@ -11,11 +11,12 @@ class ProteinTokenizer:
         amino_dict=None,
     ):
         if dataset == 'egnn-data':
+            # keys: ['name', 'seq', 'coords']
             with open('./data/egnn_data/ts50.json', 'r') as json_file:
-                data = json.load(json_file)
+                self.data = json.load(json_file)
                 
         # Extract sequences
-        self.sequences = [protein['seq'] for protein in data]
+        self.sequences = [protein['seq'] for protein in self.data]
         self.max_length = np.max([len(seq) for seq in self.sequences])
         self.max_index = np.argmax([len(seq) for seq in self.sequences])
         
@@ -49,11 +50,11 @@ class ProteinTokenizer:
         Return the tokens and the masks.
         """
         print(f"Tokening the data...")
-        tokens = list(map(self.encode, self.sequences))
+        input_ids = list(map(self.encode, self.sequences))
         # Generate masks (1 for non-padding, 0 for padding)
-        masks = [[1 if token != self.amino2dict['<PAD>'] else 0 for token in seq] for seq in tokens]
+        masks = [[1 if token != self.amino2dict['<PAD>'] else 0 for token in seq] for seq in input_ids]
         
-        return tokens, masks
+        return input_ids, masks
     
     def decode(self, tokens):
         """
