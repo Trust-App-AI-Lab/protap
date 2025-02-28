@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
 
-from prot_learn.utils.helper_functions import *
+from utils.helper_functions import *
 # helper classes
 
 # this follows the same strategy for normalization as done in SE3 Transformers

@@ -3,7 +3,7 @@ import json
 import torch
 import numpy as np
 
-from prot_learn.models.egnn.egnn import *
+from models.egnn.egnn import *
 
 # load the protein data.
 with open('/home/yuliangyan/Code/gvp-pytorch/data/ts50.json', 'r') as json_file:
