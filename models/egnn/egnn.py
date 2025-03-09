@@ -367,7 +367,7 @@ class EGNN_Network(nn.Module):
         self.residue_prediction = residue_prediction
         if self.residue_prediction: 
             # 20 types of amino acid and one <PAD> token.
-            self.residue_mlp = nn.Linear(in_features=dim, out_features=21)
+            self.residue_mlp = nn.Linear(in_features=dim, out_features=22)
 
     def forward(
         self,
@@ -429,11 +429,12 @@ class EGNN_Network(nn.Module):
 
             feats, coors = egnn(feats, coors, adj_mat = adj_mat, edges = edges, mask = mask)
             coor_changes.append(coors)
+        
+        if self.residue_prediction:
+            feats = self.residue_mlp(feats) # (batch_size, seq_length, 22)
 
         if return_coor_changes:
             return feats, coors, coor_changes
 
-        if self.residue_prediction:
-            feats = self.residue_mlp(feats) # (batch_size, seq_length, 21)
 
         return feats, coors
