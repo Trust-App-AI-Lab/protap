@@ -26,7 +26,8 @@ class ProteinTokenizer:
         # Build amino acid dictionary
         # Collect unique amino acids from the longest sequence
         self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[self.max_index]))
-        self.amino_dict.append('<PAD>')  # Add padding token
+        self.amino_dict.append('<MASK>') # Add mask token for residue prediction.
+        self.amino_dict.append('<PAD>')  # Add padding token to pad the amino sequence to the same length for batch training.
         # Mapping from amino acid to index
         self.amino2dict = {amino: idx for idx, amino in enumerate(self.amino_dict)}
         

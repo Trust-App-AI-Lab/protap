@@ -267,10 +267,10 @@ class EGNN(nn.Module):
 
         if exists(mask):
             mask_i = rearrange(mask, 'b i -> b i ()')
-
             if use_nearest:
                 mask_j = batched_index_select(mask, nbhd_indices, dim = 1)
                 mask = (mask_i * mask_j) & nbhd_mask
+                print(mask,mask.shape)
             else:
                 mask_j = rearrange(mask, 'b j -> b () j')
                 mask = mask_i * mask_j
@@ -332,6 +332,7 @@ class EGNN_Network(nn.Module):
         global_linear_attn_heads = 8,
         global_linear_attn_dim_head = 64,
         num_global_tokens = 4,
+        residue_prediction=False,
         **kwargs
     ):
         super().__init__()
@@ -362,6 +363,11 @@ class EGNN_Network(nn.Module):
                 GlobalLinearAttention(dim = dim, heads = global_linear_attn_heads, dim_head = global_linear_attn_dim_head) if is_global_layer else None,
                 EGNN(dim = dim, edge_dim = (edge_dim + adj_dim), norm_feats = True, **kwargs),
             ]))
+            
+        self.residue_prediction = residue_prediction
+        if self.residue_prediction: 
+            # 20 types of amino acid and one <PAD> token.
+            self.residue_mlp = nn.Linear(in_features=dim, out_features=21)
 
     def forward(
         self,
@@ -426,5 +432,8 @@ class EGNN_Network(nn.Module):
 
         if return_coor_changes:
             return feats, coors, coor_changes
+
+        if self.residue_prediction:
+            feats = self.residue_mlp(feats) # (batch_size, seq_length, 21)
 
         return feats, coors
