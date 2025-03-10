@@ -12,7 +12,9 @@ class ProteinTokenizer:
     ):
         if dataset == 'egnn-data':
             # keys: ['name', 'seq', 'coords']
-            with open('./data/egnn_data/ts50.json', 'r') as json_file:
+            # with open('./data/egnn_data/ts50.json', 'r') as json_file:
+            #     self.data = json.load(json_file)
+            with open('/mnt/data/shuoyan/swiss_20k.json', 'r') as json_file:
                 self.data = json.load(json_file)
                 
         # Extract sequences
@@ -36,6 +38,7 @@ class ProteinTokenizer:
         Encodes a protein sequence into a list of token indices.
         Pads the sequence to the maximum length.
         """
+        # TODO: Obtain the max length.
         # Map each amino acid in the sequence to its corresponding index in amino2dict
         encoded = [self.amino2dict.get(aa, self.amino2dict['<PAD>']) for aa in sequence]
         
