@@ -2,10 +2,11 @@ torchrun --nproc_per_node=4  egnn_pretrain.py \
     --model_name_or_path "google-t5/t5-base" \
     --data_path "./data/contrastive_set" \
     --bf16 True \
-    --output_dir "./checkpoints/egnn/egnn_node_0310" \
+    --output_dir "./checkpoints/egnn/egnn_node_0310.pt" \
     --run_name 'egnn-pretrain-node-0310' \
     --residue_prediction True \
-    --num_train_epochs 250 \
+    --num_epochs 150 \
+    --batch_size 24 \
     --per_device_train_batch_size 24 \
     --per_device_eval_batch_size 4 \
     --evaluation_strategy "no" \

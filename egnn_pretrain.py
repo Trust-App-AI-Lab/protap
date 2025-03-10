@@ -34,6 +34,8 @@ class TrainingArguments(transformers.TrainingArguments):
     hidden_dim: int = field(default=512)
     max_amino_acids_sequence_length: int = field(default=256)
     mask_ratio: float = field(default=0.15)
+    num_epochs: int = field(default=200)
+    batch_size: int = field(default=24)
     max_grad_norm: str = field(default=1.0)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(
@@ -90,9 +92,15 @@ if __name__ == '__main__':
     
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
     
-    trainer.train(model=net, dataset=dataset, optimizer=optimizer)
+    trainer.train(
+        model=net,
+        dataset=dataset,
+        optimizer=optimizer,
+        num_epochs=training_args.num_epochs,
+        batch_size=training_args.batch_size
+    )
     
-    training_args.output_dir = training_args.output_dir
-    trainer.model.save_pretrained(training_args.output_dir)
+    # trainer.model.save_pretrained(training_args.output_dir)
+    torch.save(net, training_args.output_dir)
     
     wandb.finish()
