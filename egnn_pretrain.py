@@ -1,5 +1,7 @@
 import os
 
+import wandb
+from torch.utils.data import DataLoader
 import transformers
 from transformers import set_seed
 from dataclasses import dataclass, field
@@ -26,8 +28,12 @@ class DataArguments:
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
-    # report_to: str = field(default="wandb")
-    # run_name: str = field(default='llm-fingerprint-1109')
+    report_to: str = field(default="wandb")
+    run_name: str = field(default='egnn-pretrain-0310')
+    residue_prediction: bool = field(default=False)
+    hidden_dim: int = field(default=512)
+    max_amino_acids_sequence_length: int = field(default=256)
+    mask_ratio: float = field(default=0.15)
     max_grad_norm: str = field(default=1.0)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(
@@ -47,8 +53,7 @@ class TrainingArguments(transformers.TrainingArguments):
 if __name__ == '__main__':
     set_seed(42)
 
-    # TODO
-    # os.environ["WANDB_PROJECT"]="llm-fingerprint"
+    os.environ["WANDB_PROJECT"]="protein-pretrain"
     
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
@@ -57,33 +62,37 @@ if __name__ == '__main__':
     
     tokenizer = ProteinTokenizer(max_seq_length=256, dataset='egnn-data')
     dataset = EgnnDataset(tokenizer=tokenizer)
-    print(dataset[0])
+    print(len(dataset))
 
     net = EGNN_Network(
         num_tokens=22,
-        num_positions=256,           # unless what you are passing in is an unordered set, set this to the maximum sequence length
-        dim=2,
+        num_positions=training_args.max_amino_acids_sequence_length,           # unless what you are passing in is an unordered set, set this to the maximum sequence length
+        dim=training_args.hidden_dim,
         depth=3,
         num_nearest_neighbors=8,
         coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
-        residue_prediction=True
+        residue_prediction=training_args.residue_prediction,
     )
-
-    # feats = dataset[0:1]['input_ids']
-    # coords = dataset[0:1]['coords']
-    # masks = dataset[0:1]['masks']
-
-    # feats_out, coors_out = net(feats, coords, mask = masks) # (1, 1024, 32), (1, 1024, 3)
-    # print(feats_out.shape)
-    # print(feats_out)
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
+    
+    dataloader = DataLoader(dataset=dataset, batch_size=2, collate_fn=data_collator)
+    for batch in dataloader:
+        print(batch)
+        break
 
     trainer = AttributeMaskingTrainer(
         model=net,
         args=training_args,
         data_collator=data_collator,
-        train_dataset=dataset
+        train_dataset=dataset,
     )
-    # TODO
-    trainer.train()
+    
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+    
+    trainer.train(model=net, dataset=dataset, optimizer=optimizer)
+    
+    training_args.output_dir = training_args.output_dir
+    trainer.model.save_pretrained(training_args.output_dir)
+    
+    wandb.finish()

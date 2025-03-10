@@ -1,9 +1,10 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset as ds
+from datasets import Dataset
 
 from data.tokenizers import ProteinTokenizer
 
-class ProteinDataset(Dataset):
+class ProteinDataset(ds):
     def __init__(self):
         """
         Dataset for protein sequences.
@@ -58,12 +59,18 @@ class EgnnDataset(ProteinDataset):
             for coord in coords:
                 x.append(coord[1]) # The second one is the C-alpha coordinate.
             self.coords.append(x)
-        print(self.coords[0])
 
         # Padding for coordinates.
         self.coords = [coord + [[0, 0, 0]] * (self.max_seq_length - len(coord)) if len(coord) < self.max_seq_length else coord for coord in self.coords]
         
         self.input_ids, self.masks = self.tokenizer.tokenize()
+        
+        
+        self.dataset = {"input_ids" : self.input_ids,
+                        "coords" : self.coords,
+                        "masks" : self.masks,
+                    }
+        self.raw_dataset = Dataset.from_dict(self.dataset)
     
     def __len__(self):
         """
@@ -92,8 +99,14 @@ class EgnnDataset(ProteinDataset):
         input_ids = self.input_ids[idx]
         masks = self.masks[idx]
         
+        
         return {
             'input_ids': torch.tensor(input_ids),
             'coords': torch.tensor(coords),
             'masks': torch.tensor(masks).bool(),
         }
+        # return {
+        #     "input_ids" : torch.tensor(self.raw_dataset[idx]['input_ids']),
+        #     "coords" : torch.tensor(self.raw_dataset[idx]['coords']),
+        #     "masks" : torch.tensor(self.raw_dataset[idx]["masks"])
+        # }

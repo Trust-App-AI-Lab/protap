@@ -2,10 +2,11 @@ import transformers
 from transformers import Trainer, TrainingArguments
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from dataclasses import dataclass
 
 from typing import Sequence, Dict
+from tqdm import tqdm
 
 EGNN_MASK_TOKEN = 20 # The <MASK> token is used for residue prediction task.
 EGNN_PAD_TOKEN = 21 # The <PAD> token is used for padding.
@@ -16,6 +17,7 @@ class DataCollatorForEgnnMaskResiduePrediction(object):
     """Collate examples for training EGNN with Maksed Residue Prediction task."""
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
         input_ids, coords, masks = tuple(
             [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
         )
@@ -45,8 +47,13 @@ class AttributeMaskingTrainer(Trainer):
         """
         Compute loss for a batch using cross entropy loss.
         """
+        # print(inputs["input_ids"])
+        model.to("cuda")
         batch_input_ids, batch_coords, batch_masks = inputs['input_ids'], inputs['coords'], inputs['masks']
-        batch_size, seq_len = batch_input_ids.shape
+        batch_size = len(batch_input_ids)
+        batch_input_ids = torch.stack(batch_input_ids, dim=0)
+        batch_coords = torch.stack(batch_coords, dim=0)
+        batch_masks = torch.stack(batch_masks, dim=0)
         target = torch.full_like(batch_input_ids, -100)
         
         selected_indices_list = []  # To store selected mask indices per batch.
@@ -60,14 +67,20 @@ class AttributeMaskingTrainer(Trainer):
             mask_indices = torch.randperm(len(non_pad_indices))[:num_to_mask] # (num_to_mask, )
             
             selected_indices = non_pad_indices[mask_indices] # (num_to_mask, )
-            target[i, selected_indices] = batch_input_ids[selected_indices]  # Assign the masked reidues with their labels.
+            target[i, selected_indices] = batch_input_ids[i, selected_indices]  # Assign the masked reidues with their labels.
             # Mask the selected residues with mask token.
             masked_input_ids[i, selected_indices] = EGNN_MASK_TOKEN
             
             selected_indices_list.append(selected_indices)
         
         inputs['input_ids'] = masked_input_ids  # Replace the original input_ids with the masked version
-        pred = model(**inputs)  # (batch_size, seq_length, 22)
+        inputs = {
+            "feats" : inputs["input_ids"].to("cuda"),
+            "coors" : batch_coords.to("cuda"),
+            "mask" : batch_masks.to("cuda")
+        }
+        
+        pred = model(**inputs)
         
         # Gather logits for only the selected masked positions
         selected_indices_tensor = torch.cat(selected_indices_list)  # Flatten into a single tensor
@@ -80,3 +93,50 @@ class AttributeMaskingTrainer(Trainer):
         loss = F.cross_entropy(masked_logits, masked_targets)
         
         return loss
+
+    def train(self, model, dataset, optimizer, num_epochs=10, batch_size=8, device='cuda'):
+        """
+        Trains the EGNN model using masked residue prediction.
+
+        Args:
+            model (torch.nn.Module): The EGNN model.
+            dataset (EgnnDataset): The dataset for training.
+            compute_loss (function): The loss computation function.
+            optimizer (torch.optim.Optimizer): The optimizer.
+            num_epochs (int): Number of training epochs.
+            batch_size (int): Batch size for training.
+            device (str): Device to use for training ('cuda' or 'cpu').
+        """
+    
+        # Move model to device
+        model.to(device)
+        model.train()
+
+        # Create DataLoader
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DataCollatorForEgnnMaskResiduePrediction())
+
+        for epoch in range(num_epochs):
+            epoch_loss = 0.0
+            progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+
+            for batch in progress_bar:
+                # Move batch to device
+                # batch = {key: value.to(device) for key, value in batch.items()}
+                # print(batch)
+                
+                optimizer.zero_grad()  # Reset gradients
+                
+                # Compute loss
+                # loss = compute_loss(model, batch)
+                loss = self.compute_loss(model=model, inputs=batch)
+                
+                loss.backward()  # Backpropagation
+                optimizer.step()  # Update model parameters
+
+                # Track loss
+                epoch_loss += loss.item()
+                progress_bar.set_postfix(loss=loss.item())
+
+            print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
+
+        print("Training complete!")
