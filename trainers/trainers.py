@@ -80,14 +80,14 @@ class AttributeMaskingTrainer(Trainer):
             "mask" : batch_masks.to("cuda")
         }
         
-        pred = model(**inputs)
+        pred = model(**inputs)[0]
         
         # Gather logits for only the selected masked positions
         selected_indices_tensor = torch.cat(selected_indices_list)  # Flatten into a single tensor
-        batch_indices = torch.arange(batch_size).repeat_interleave([len(indices) for indices in selected_indices_list])
+        batch_indices = torch.arange(batch_size).repeat_interleave(torch.tensor([len(indices) for indices in selected_indices_list]))
         
-        masked_logits = pred[batch_indices, selected_indices_tensor]  # (num_total_masked, 22)
-        masked_targets = target[batch_indices, selected_indices_tensor]  # (num_total_masked,)
+        masked_logits = pred[batch_indices, selected_indices_tensor].to("cuda")  # (num_total_masked, 22)
+        masked_targets = target[batch_indices, selected_indices_tensor].to("cuda")  # (num_total_masked,)
 
         # Compute cross-entropy loss only on masked residues
         loss = F.cross_entropy(masked_logits, masked_targets)
