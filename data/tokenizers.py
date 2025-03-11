@@ -9,6 +9,7 @@ class ProteinTokenizer:
         max_seq_length: int,
         dataset,
         amino_dict=None,
+        padding_to_longest=False,
     ):
         if dataset == 'egnn-data':
             # keys: ['name', 'seq', 'coords']
@@ -19,17 +20,21 @@ class ProteinTokenizer:
                 
         # Extract sequences
         self.sequences = [protein['seq'] for protein in self.data]
-        self.max_length = np.max([len(seq) for seq in self.sequences])
+        self.max_length = np.max([len(seq) for seq in self.sequences]) # Specify the max length of the amino acids sequence in the training data.
         self.max_index = np.argmax([len(seq) for seq in self.sequences])
         
         # Pad the sequence to the max sequence length.
-        self.max_seq_length = max_seq_length
+        if padding_to_longest:
+            self.max_seq_length = self.max_length
+        else:
+            self.max_seq_length = max_seq_length
 
         # Build amino acid dictionary
         # Collect unique amino acids from the longest sequence
         self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[self.max_index]))
         self.amino_dict.append('<MASK>') # Add mask token for residue prediction.
         self.amino_dict.append('<PAD>')  # Add padding token to pad the amino sequence to the same length for batch training.
+        self.amino_numbers = len(self.amino_dict) # Obtain the amino acids types, including the <MASK> and the <PAD>.
         # Mapping from amino acid to index
         self.amino2dict = {amino: idx for idx, amino in enumerate(self.amino_dict)}
         

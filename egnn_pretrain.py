@@ -62,13 +62,15 @@ if __name__ == '__main__':
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
-    tokenizer = ProteinTokenizer(max_seq_length=256, dataset='egnn-data')
+    tokenizer = ProteinTokenizer(max_seq_length=256, dataset='egnn-data', padding_to_longest=True)
     dataset = EgnnDataset(tokenizer=tokenizer)
     print(len(dataset))
+    
+    training_args.max_amino_acids_sequence_length = tokenizer.max_seq_length
 
     net = EGNN_Network(
-        num_tokens=22,
-        num_positions=training_args.max_amino_acids_sequence_length,           # unless what you are passing in is an unordered set, set this to the maximum sequence length
+        num_tokens=tokenizer.amino_numbers,
+        num_positions=training_args.max_amino_acids_sequence_length,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
         dim=training_args.hidden_dim,
         depth=3,
         num_nearest_neighbors=8,
@@ -79,9 +81,6 @@ if __name__ == '__main__':
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
     
     dataloader = DataLoader(dataset=dataset, batch_size=2, collate_fn=data_collator)
-    for batch in dataloader:
-        print(batch)
-        break
 
     trainer = AttributeMaskingTrainer(
         model=net,
