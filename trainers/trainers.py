@@ -146,7 +146,15 @@ class AttributeMaskingTrainer(Trainer):
 
 
 class ContrastiveEGNNTrainer(Trainer):
-    def __init__(self, model, dataset, optimizer, batch_size=32, k=10, device="cuda"):
+    def __init__(
+        self, 
+        model, 
+        dataset, 
+        optimizer, 
+        batch_size=32, 
+        k=10, 
+        device="cuda"
+    ):
         """
         Initializes the trainer.
 

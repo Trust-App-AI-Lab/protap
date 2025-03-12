@@ -48,7 +48,10 @@ class ProteinTokenizer:
         encoded = [self.amino2dict.get(aa, self.amino2dict['<PAD>']) for aa in sequence]
         
         # Pad the sequence if it's shorter than max_length
-        if len(encoded) < self.max_seq_length:
+        # Truncate the sequence if needed.
+        if len(encoded) > self.max_seq_length:
+            encoded = encoded[:self.max_seq_length]
+        elif len(encoded) < self.max_seq_length:
             encoded += [self.amino2dict['<PAD>']] * (self.max_seq_length - len(encoded))
         
         return encoded
