@@ -50,18 +50,22 @@ class EgnnDataset(ProteinDataset):
         self.data = self.tokenizer.data
         
         self.max_seq_length = self.tokenizer.max_seq_length
+        
         # Obtain the 3-d C-alpha coordinate.
         self.coords = [] # (n, seq_length, 3)
         for protein in self.data:
             coords = protein['coords']
-            x = []
-            # Iterate the amino acids in the sequence.
-            for coord in coords:
-                x.append(coord[1]) # The second one is the C-alpha coordinate.
-            self.coords.append(x)
+            x = [coord[1] for coord in coords]  # Extract C-alpha coordinates
 
-        # Padding for coordinates.
-        self.coords = [coord + [[0, 0, 0]] * (self.max_seq_length - len(coord)) if len(coord) < self.max_seq_length else coord for coord in self.coords]
+            # Truncate if necessary
+            if len(x) > self.max_seq_length:
+                x = x[:self.max_seq_length]
+            # Pad if necessary
+            elif len(x) < self.max_seq_length:
+                x += [[0, 0, 0]] * (self.max_seq_length - len(x))
+            
+            self.coords.append(x)
+        
         
         self.input_ids, self.masks = self.tokenizer.tokenize()
         

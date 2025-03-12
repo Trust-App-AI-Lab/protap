@@ -270,7 +270,6 @@ class EGNN(nn.Module):
             if use_nearest:
                 mask_j = batched_index_select(mask, nbhd_indices, dim = 1)
                 mask = (mask_i * mask_j) & nbhd_mask
-                print(mask,mask.shape)
             else:
                 mask_j = rearrange(mask, 'b j -> b () j')
                 mask = mask_i * mask_j

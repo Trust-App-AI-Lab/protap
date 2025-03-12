@@ -62,7 +62,7 @@ if __name__ == '__main__':
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
-    tokenizer = ProteinTokenizer(max_seq_length=256, dataset='egnn-data', padding_to_longest=True)
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset='egnn-data', padding_to_longest=False)
     dataset = EgnnDataset(tokenizer=tokenizer)
     print(len(dataset))
     
