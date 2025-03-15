@@ -1,6 +1,9 @@
 import json
-import numpy as np
+from tqdm import tqdm
 
+import numpy as np
+from datasets import Dataset
+import torch.distributed as dist
 
 # ProteinTokenizer class to tokenize protein sequences
 class ProteinTokenizer:
@@ -11,17 +14,46 @@ class ProteinTokenizer:
         amino_dict=None,
         padding_to_longest=False,
     ):
-        if dataset == 'egnn-data':
+        # if dataset == 'egnn-data':
             # keys: ['name', 'seq', 'coords']
             # with open('./data/egnn_data/ts50.json', 'r') as json_file:
             #     self.data = json.load(json_file)
-            with open('/mnt/data/shuoyan/swiss_20k.json', 'r') as json_file:
-                self.data = json.load(json_file)
+            # with open('/mnt/data/shuoyan/swiss_20k.json', 'r') as json_file:
+            #     self.data = json.load(json_file)
+            
+            # Complete dataset.
+            # TODO: Load speed is too slow.
+            # if dist.get_rank() == 0:
+            #     print("Loading Json File...")
+            #     with open('/mnt/data/shuoyan/swiss_540k_list.json') as json_file:
+            #         self.data = json.load(json_file)
+            
+            # dist.barrier()
+            
+            # data_list = [self.data] if dist.get_rank() == 0 else [None]
+            # dist.broadcast_object_list(data_list, src=0)
+            
+            # self.data = data_list[0]
+            
+            # self.data = self.data if self.data else [None] * dist.get_world_size()
+            # self.data = self.data[dist.get_rank()]
+            
+            # print("Load Complete!")
+        
+        self.data = dataset
+            # self.dataset_path = '/mnt/data/shuoyan/swiss_540k_list.json'
                 
         # Extract sequences
-        self.sequences = [protein['seq'] for protein in self.data]
-        self.max_length = np.max([len(seq) for seq in self.sequences]) # Specify the max length of the amino acids sequence in the training data.
-        self.max_index = np.argmax([len(seq) for seq in self.sequences])
+        # self.data = Dataset.from_json(self.dataset_path)
+        # self.sequences = []
+        # for i in tqdm(range(len(self.data))):
+        #     self.sequences.append(self.data[i]['seq'])
+        self.sequences = self.data['seq']
+        # self.sequences = [protein['seq'] for protein in self.data]
+        print(f"Dataset Length is {len(self.sequences)}")
+
+        # self.max_length = np.max([len(seq) for seq in self.sequences]) # Specify the max length of the amino acids sequence in the training data.
+        # self.max_index = np.argmax([len(seq) for seq in self.sequences])
         
         # Pad the sequence to the max sequence length.
         if padding_to_longest:
@@ -31,7 +63,9 @@ class ProteinTokenizer:
 
         # Build amino acid dictionary
         # Collect unique amino acids from the longest sequence
-        self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[self.max_index]))
+        # self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[self.max_index]))
+        self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[155]))
+        
         self.amino_dict.append('<MASK>') # Add mask token for residue prediction.
         self.amino_dict.append('<PAD>')  # Add padding token to pad the amino sequence to the same length for batch training.
         self.amino_numbers = len(self.amino_dict) # Obtain the amino acids types, including the <MASK> and the <PAD>.
@@ -62,8 +96,13 @@ class ProteinTokenizer:
         Return the tokens and the masks.
         """
         print(f"Tokening the data...")
-        input_ids = list(map(self.encode, self.sequences))
+        # BUG
+        # input_ids = list(map(self.encode, self.sequences))
+        input_ids = []
+        for i in tqdm(range(len(self.sequences))):
+            input_ids.append(self.encode(self.sequences[i]))
         # Generate masks (1 for non-padding, 0 for padding)
+        print("Generate the masks...")
         masks = [[1 if token != self.amino2dict['<PAD>'] else 0 for token in seq] for seq in input_ids]
         
         return input_ids, masks

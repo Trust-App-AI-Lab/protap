@@ -1,6 +1,8 @@
 import torch
 from torch.utils.data import Dataset as ds
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
+
+from tqdm import tqdm
 
 from data.tokenizers import ProteinTokenizer
 
@@ -44,37 +46,51 @@ class EgnnDataset(ProteinDataset):
     def __init__(
         self,
         tokenizer: ProteinTokenizer,
+        generate: bool=False,
     ):  
-        self.tokenizer = tokenizer
-        self.sequences = self.tokenizer.sequences
-        self.data = self.tokenizer.data
-        
-        self.max_seq_length = self.tokenizer.max_seq_length
-        
-        # Obtain the 3-d C-alpha coordinate.
-        self.coords = [] # (n, seq_length, 3)
-        for protein in self.data:
-            coords = protein['coords']
-            x = [coord[1] for coord in coords]  # Extract C-alpha coordinates
-
-            # Truncate if necessary
-            if len(x) > self.max_seq_length:
-                x = x[:self.max_seq_length]
-            # Pad if necessary
-            elif len(x) < self.max_seq_length:
-                x += [[0, 0, 0]] * (self.max_seq_length - len(x))
+        # Generate the dataset from scrach.
+        if generate:
+            self.tokenizer = tokenizer
+            self.sequences = self.tokenizer.sequences
+            self.data = self.tokenizer.data
             
-            self.coords.append(x)
-        
-        
-        self.input_ids, self.masks = self.tokenizer.tokenize()
-        
-        
-        self.dataset = {"input_ids" : self.input_ids,
-                        "coords" : self.coords,
-                        "masks" : self.masks,
-                    }
-        self.raw_dataset = Dataset.from_dict(self.dataset)
+            self.max_seq_length = self.tokenizer.max_seq_length
+            
+            # Obtain the 3-d C-alpha coordinate.
+            self.coords = [] # (n, seq_length, 3)
+            for protein in tqdm(self.data):
+                coords = protein['coords']
+                x = [coord[1] for coord in coords]  # Extract C-alpha coordinates
+
+                # Truncate if necessary
+                if len(x) > self.max_seq_length:
+                    x = x[:self.max_seq_length]
+                # Pad if necessary
+                elif len(x) < self.max_seq_length:
+                    x += [[0, 0, 0]] * (self.max_seq_length - len(x))
+                
+                self.coords.append(x)
+            
+            
+            self.input_ids, self.masks = self.tokenizer.tokenize()
+            
+            
+            self.dataset = {"input_ids" : self.input_ids,
+                            "coords" : self.coords,
+                            "masks" : self.masks,
+                        }
+            self.raw_dataset = Dataset.from_dict(self.dataset)
+            
+            # TODO
+            self.raw_dataset = self.raw_dataset.save_to_disk('swiss-540k-pre-train')
+        else:
+            # self.tokenizer = tokenizer
+            # self.sequences = self.tokenizer.sequences
+            self.raw_dataset = load_from_disk('swiss-540k-pre-train')
+            # self.raw_dataset.set_format(type="torch", columns=["input_ids", "coords", "masks"])
+            self.input_ids = self.raw_dataset['input_ids']
+            self.coords = self.raw_dataset['coords']
+            self.masks = self.raw_dataset['masks']
     
     def __len__(self):
         """
@@ -96,7 +112,7 @@ class EgnnDataset(ProteinDataset):
           - 'coords': The 3D coordinates for the protein sequence.
         """
         # Get the sequence and coordinates
-        sequence = self.sequences[idx]
+        # sequence = self.sequences[idx]
         coords = self.coords[idx]
         
         # Get the input_ids and masks.
@@ -109,6 +125,11 @@ class EgnnDataset(ProteinDataset):
             'coords': torch.tensor(coords),
             'masks': torch.tensor(masks).bool(),
         }
+        # return {
+        #     'input_ids': input_ids,
+        #     'coords': coords,
+        #     'masks': masks,
+        # }
         # return {
         #     "input_ids" : torch.tensor(self.raw_dataset[idx]['input_ids']),
         #     "coords" : torch.tensor(self.raw_dataset[idx]['coords']),

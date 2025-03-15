@@ -1,22 +1,20 @@
 torchrun --nproc_per_node=8  egnn_pretrain.py \
     --model_name_or_path "google-t5/t5-base" \
-    --data_path "./data/contrastive_set" \
+    --data_path "./data/swiss-protein-540k-tensor" \
     --bf16 True \
-    --output_dir "./checkpoints/egnn/egnn_node_0310.pt" \
-    --run_name 'egnn-pretrain-node-0310' \
+    --output_dir "./checkpoints/egnn/egnn_node_0315.pt" \
+    --run_name 'egnn-pretrain-node-0315' \
     --residue_prediction True \
-    --num_epochs 150 \
-    --batch_size 24 \
-    --per_device_train_batch_size 24 \
+    --num_train_epochs 50 \
+    --per_device_train_batch_size 48 \
     --per_device_eval_batch_size 4 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 2000 \
+    --save_steps 5000 \
     --save_total_limit 1 \
-    --learning_rate 2e-4 \
+    --learning_rate 3e-4 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --fsdp "full_shard auto_wrap" \
-    # --tf32 True
