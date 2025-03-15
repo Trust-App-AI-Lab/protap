@@ -1,4 +1,4 @@
-
+import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -23,7 +23,8 @@ class DataCollatorForEgnnMaskResiduePrediction(object):
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         
         input_ids, coords, masks = tuple(
-            [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask")
         )
         
         return dict(
@@ -47,17 +48,19 @@ class AttributeMaskingTrainer(Trainer):
         self,
         model,
         inputs,
+        num_items_in_batch=None, # Must add this arg.
     ):
         """
         Compute loss for a batch using cross entropy loss.
         """
-        # print(inputs["input_ids"])
         model.to("cuda")
         batch_input_ids, batch_coords, batch_masks = inputs['input_ids'], inputs['coords'], inputs['masks']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        
         batch_size = len(batch_input_ids)
-        batch_input_ids = torch.stack(batch_input_ids, dim=0)
-        batch_coords = torch.stack(batch_coords, dim=0)
-        batch_masks = torch.stack(batch_masks, dim=0)
         target = torch.full_like(batch_input_ids, -100)
         
         selected_indices_list = []  # To store selected mask indices per batch.
@@ -98,52 +101,69 @@ class AttributeMaskingTrainer(Trainer):
         
         return loss
 
-    def train(self, model, dataset, optimizer, num_epochs=10, batch_size=8, device='cuda'):
-        """
-        Trains the EGNN model using masked residue prediction.
+    # Custom version of trainer.
+    # def train(self, optimizer, scheduler, accelerator, num_epochs=10, batch_size=8, device='cuda'):
+    #     """
+    #     Trains the EGNN model using masked residue prediction.
 
-        Args:
-            model (torch.nn.Module): The EGNN model.
-            dataset (EgnnDataset): The dataset for training.
-            compute_loss (function): The loss computation function.
-            optimizer (torch.optim.Optimizer): The optimizer.
-            num_epochs (int): Number of training epochs.
-            batch_size (int): Batch size for training.
-            device (str): Device to use for training ('cuda' or 'cpu').
-        """
+    #     Args:
+    #         model (torch.nn.Module): The EGNN model.
+    #         dataset (EgnnDataset): The dataset for training.
+    #         compute_loss (function): The loss computation function.
+    #         optimizer (torch.optim.Optimizer): The optimizer.
+    #         num_epochs (int): Number of training epochs.
+    #         batch_size (int): Batch size for training.
+    #         device (str): Device to use for training ('cuda' or 'cpu').
+    #     """
     
-        # Move model to device
-        model.to(device)
-        model.train()
+    #     # Move model to device
+    #     self.model.to(device)
+    #     self.model.train()
+        
 
-        # Create DataLoader
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DataCollatorForEgnnMaskResiduePrediction())
+    #     # Create DataLoader
+    #     dataloader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True, collate_fn=self.data_collator)
+    #     os.makedirs(self.args.output_dir, exist_ok=True)
+        
+    #     # self.model, optimizer, dataloader, scheduler = accelerator.prepare(self.model, optimizer, dataloader, scheduler)
 
-        for epoch in range(num_epochs):
-            epoch_loss = 0.0
-            progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+    #     step = 0
+    #     for epoch in range(num_epochs):
+    #         epoch_loss = 0.0
+    #         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
 
-            for batch in progress_bar:
-                # Move batch to device
-                # batch = {key: value.to(device) for key, value in batch.items()}
-                # print(batch)
+    #         for batch in progress_bar:
+    #             # Move batch to device
+    #             # batch = {key: value.to(device) for key, value in batch.items()}
+    #             # print(batch)
                 
-                optimizer.zero_grad()  # Reset gradients
+    #             optimizer.zero_grad()  # Reset gradients
                 
-                # Compute loss
-                # loss = compute_loss(model, batch)
-                loss = self.compute_loss(model=model, inputs=batch)
+    #             # Compute loss
+    #             loss = self.compute_loss(model=self.model, inputs=batch)
                 
-                loss.backward()  # Backpropagation
-                optimizer.step()  # Update model parameters
+    #             loss.backward()  # Backpropagation
+    #             optimizer.step()  # Update model parameters
+                
+    #             scheduler.step() # Update the learning rate
 
-                # Track loss
-                epoch_loss += loss.item()
-                progress_bar.set_postfix(loss=loss.item())
+    #             # Track loss
+    #             epoch_loss += loss.item()
+    #             progress_bar.set_postfix(loss=loss.item())
+                
+    #                             # Save checkpoint every `save_steps`
+    #             if accelerator.is_main_process:
+    #                 if step % self.args.save_steps == 0:
+    #                     checkpoint_path = os.path.join(self.args.output_dir, f"checkpoint_step_{step}.pt")
+    #                     torch.save({"epoch": epoch, "step": step, "model_state": self.model.state_dict(), "optimizer_state": optimizer.state_dict()}, checkpoint_path)
+    #                     print(f"Checkpoint saved at {checkpoint_path}")
+                
+    #             step += 1
+            
+    #         if accelerator.is_main_process:
+    #             print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
 
-            print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
-
-        print("Training complete!")
+    #     print("Training complete!")
 
 
 class ContrastiveEGNNTrainer(Trainer):

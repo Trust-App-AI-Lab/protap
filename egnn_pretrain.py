@@ -1,15 +1,13 @@
 import os
 
 import wandb
-from torch.utils.data import DataLoader
 import transformers
 from transformers import set_seed
+from datasets import load_from_disk
 from dataclasses import dataclass, field
 from typing import Optional
 
 from models.egnn.egnn import *
-from data.dataset import EgnnDataset
-from data.tokenizers import ProteinTokenizer
 from trainers.trainers import AttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction
 
 
@@ -32,10 +30,8 @@ class TrainingArguments(transformers.TrainingArguments):
     run_name: str = field(default='egnn-pretrain-0310')
     residue_prediction: bool = field(default=False)
     hidden_dim: int = field(default=512)
-    max_amino_acids_sequence_length: int = field(default=256)
+    max_amino_acids_sequence_length: int = field(default=768)
     mask_ratio: float = field(default=0.15)
-    num_epochs: int = field(default=200)
-    batch_size: int = field(default=24)
     max_grad_norm: str = field(default=1.0)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(
@@ -54,7 +50,6 @@ class TrainingArguments(transformers.TrainingArguments):
 
 if __name__ == '__main__':
     set_seed(42)
-
     os.environ["WANDB_PROJECT"]="protein-pretrain"
     
     parser = transformers.HfArgumentParser(
@@ -62,14 +57,20 @@ if __name__ == '__main__':
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
-    tokenizer = ProteinTokenizer(max_seq_length=768, dataset='egnn-data', padding_to_longest=False)
-    dataset = EgnnDataset(tokenizer=tokenizer)
+    print("Loading Dataset...")
+    dataset = load_from_disk(data_args.data_path)
+    # Rename the column name for training.
+    dataset = dataset.rename_column('input_ids', 'feats')
+    dataset = dataset.rename_column('coords', 'coors')
+    dataset = dataset.rename_column('masks', 'mask')
+    
     print(len(dataset))
     
-    training_args.max_amino_acids_sequence_length = tokenizer.max_seq_length
+    # training_args.max_amino_acids_sequence_length = tokenizer.max_seq_length
 
     net = EGNN_Network(
-        num_tokens=tokenizer.amino_numbers,
+        # num_tokens=tokenizer.amino_numbers,
+        num_tokens=22,
         num_positions=training_args.max_amino_acids_sequence_length,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
         dim=training_args.hidden_dim,
         depth=3,
@@ -79,27 +80,16 @@ if __name__ == '__main__':
     )
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
-    
-    dataloader = DataLoader(dataset=dataset, batch_size=2, collate_fn=data_collator)
 
     trainer = AttributeMaskingTrainer(
         model=net,
+        train_dataset=dataset,
         args=training_args,
         data_collator=data_collator,
-        train_dataset=dataset,
     )
     
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-4)
+    trainer.train()
     
-    trainer.train(
-        model=net,
-        dataset=dataset,
-        optimizer=optimizer,
-        num_epochs=training_args.num_epochs,
-        batch_size=training_args.batch_size
-    )
-    
-    # trainer.model.save_pretrained(training_args.output_dir)
     torch.save(net, training_args.output_dir)
     
     wandb.finish()

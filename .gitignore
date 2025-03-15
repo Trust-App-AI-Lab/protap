@@ -1,0 +1,4 @@
+/data/egnn_data/
+**/__pycache__/
+/wandb
+/data
