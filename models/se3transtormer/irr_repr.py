@@ -6,8 +6,8 @@ from math import pi
 from pathlib import Path
 from functools import wraps
 
-from utils import exists, default, cast_torch_tensor, to_order
-from spherical_harmonics import get_spherical_harmonics, clear_spherical_harmonics_cache
+from models.se3transtormer.se3_utils import exists, default, cast_torch_tensor, to_order
+from models.se3transtormer.spherical_harmonics import get_spherical_harmonics, clear_spherical_harmonics_cache
 
 DATA_PATH = path = Path(os.path.dirname(__file__)) / 'data'
 
