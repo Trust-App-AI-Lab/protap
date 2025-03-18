@@ -6,10 +6,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn, einsum
 
-from basis import get_basis
-from se3_utils import exists, default, uniq, map_values, batched_index_select, masked_mean, to_order, fourier_encode, cast_tuple, safe_cat, fast_split, rand_uniform, broadcat
-from reversible import ReversibleSequence, SequentialSequence
-from rotary import SinusoidalEmbeddings, apply_rotary_pos_emb
+from models.se3transtormer.basis import get_basis
+from models.se3transtormer.se3_utils import exists, default, uniq, map_values, batched_index_select, masked_mean, to_order, fourier_encode, cast_tuple, safe_cat, fast_split, rand_uniform, broadcat
+from models.se3transtormer.reversible import ReversibleSequence, SequentialSequence
+from models.se3transtormer.rotary import SinusoidalEmbeddings, apply_rotary_pos_emb
 
 from einops import rearrange, repeat
 
