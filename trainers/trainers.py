@@ -53,7 +53,7 @@ class AttributeMaskingTrainer(Trainer):
         """
         Compute loss for a batch using cross entropy loss.
         """
-        model.to("cuda")
+        # model.to("cuda")
         batch_input_ids, batch_coords, batch_masks = inputs['input_ids'], inputs['coords'], inputs['masks']
         
         batch_input_ids = torch.stack(batch_input_ids)
@@ -81,10 +81,15 @@ class AttributeMaskingTrainer(Trainer):
             selected_indices_list.append(selected_indices)
         
         inputs['input_ids'] = masked_input_ids  # Replace the original input_ids with the masked version
+        # inputs = {
+        #     "feats" : inputs["input_ids"].to("cuda"),
+        #     "coors" : batch_coords.to("cuda"),
+        #     "mask" : batch_masks.to("cuda")
+        # }
         inputs = {
-            "feats" : inputs["input_ids"].to("cuda"),
-            "coors" : batch_coords.to("cuda"),
-            "mask" : batch_masks.to("cuda")
+            "feats" : inputs["input_ids"],
+            "coors" : batch_coords,
+            "mask" : batch_masks
         }
         
         pred = model(**inputs)[0]

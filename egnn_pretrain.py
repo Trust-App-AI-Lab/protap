@@ -1,6 +1,7 @@
 import os
 
 import wandb
+import torch.distributed as dist
 import transformers
 from transformers import set_seed
 from datasets import load_from_disk
@@ -59,6 +60,8 @@ if __name__ == '__main__':
     
     print("Loading Dataset...")
     dataset = load_from_disk(data_args.data_path)
+    # DEBUG
+    # dataset = dataset.select(range(0, 96))
     # Rename the column name for training.
     dataset = dataset.rename_column('input_ids', 'feats')
     dataset = dataset.rename_column('coords', 'coors')
@@ -89,7 +92,7 @@ if __name__ == '__main__':
     )
     
     trainer.train()
-    
-    torch.save(net, training_args.output_dir)
+    if dist.get_rank() == 0:
+        torch.save(net.state_dict(), 'egnn_node.pt')
     
     wandb.finish()
