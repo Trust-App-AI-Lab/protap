@@ -186,26 +186,18 @@ class ContrastiveEGNNTrainer(Trainer):
         self,
         model,
         inputs,
+        num_items_in_batch=None,
     ):
         """
-        Computes contrastive loss using NT-Xent.
-
-        Args:
-            z: Tensor of shape (batch_size, hidden_dim) - original embeddings.
-            pos_z: Tensor of shape (batch_size, hidden_dim) - positive samples.
-            neg_z: Tensor of shape (batch_size, hidden_dim) - negative samples.
-            tau: Temperature parameter for contrastive loss.
-
-        Returns:
-            Contrastive loss scalar.
         """
-        model.to("cuda")
+        # model.to("cuda")
         batch_input_ids, batch_coords, batch_masks = inputs['input_ids'], inputs['coords'], inputs['masks']
-        batch_size = len(batch_input_ids)
+        
         batch_input_ids = torch.stack(batch_input_ids, dim=0)
         batch_coords = torch.stack(batch_coords, dim=0)
         batch_masks = torch.stack(batch_masks, dim=0)
 
+        batch_size = len(batch_input_ids)
         embeddings = []  # Store embeddings for all views
         SAMPLING_METHODS = {
             "subspace": self.get_subspace,
@@ -243,19 +235,19 @@ class ContrastiveEGNNTrainer(Trainer):
         sub_masks_y = torch.stack(sub_masks_y)
 
         inputs_x = {
-            "feats" : sub_input_ids_x.to("cuda"),
-            "coors" : sub_coords_x.to("cuda"),
-            "mask" : sub_masks_x.to("cuda")
+            "feats" : sub_input_ids_x,
+            "coors" : sub_coords_x,
+            "mask" : sub_masks_x
         }
         inputs_y = {
-            "feats" : sub_input_ids_y.to("cuda"),
-            "coors" : sub_coords_y.to("cuda"),
-            "mask" : sub_masks_y.to("cuda")
+            "feats" : sub_input_ids_y,
+            "coors" : sub_coords_y,
+            "mask" : sub_masks_y
         }
         
         # Compute embeddings using the model
-        emb_1 = model(inputs_x)  # (batch_size, max_nodes, embedding_dim)
-        emb_2 = model(inputs_y)  # (batch_size, max_nodes, embedding_dim)
+        emb_1 = model(**inputs_x)[0]  # (batch_size, max_nodes, embedding_dim)
+        emb_2 = model(**inputs_y)[0]  # (batch_size, max_nodes, embedding_dim)
         
         def masked_mean_pooling(embeddings, masks):
             """
@@ -286,12 +278,12 @@ class ContrastiveEGNNTrainer(Trainer):
         embeddings = torch.cat([graph_emb_x, graph_emb_y], dim=0)  # (2 * batch_size, embedding_dim)
 
         # Compute cosine similarity matrix
-        sim_matrix = torch.mm(embeddings, embeddings.T)  # (2 * batch_size, 2 * batch_size)
-        sim_matrix = sim_matrix / self.args.temperature  # Apply temperature scaling
+        sim_matrix = torch.mm(embeddings, embeddings.T) / self.args.temperature  # (2 * batch_size, 2 * batch_size)
+        mask = torch.eye(2 * batch_size, dtype=torch.bool, device=sim_matrix.device) # mask the pair (i, i)
+        sim_matrix.masked_fill_(mask, float('-inf'))
 
-        # Create labels: Each sample's positive pair is its adjacent index
-        labels = torch.arange(0, 2 * batch_size, 2)  # (batch_size,)
-        labels = torch.cat([labels + 1, labels], dim=0)  # (2 * batch_size,) - Each sample's positive pair
+        # Create labels
+        labels = torch.cat([torch.arange(batch_size, 2 * batch_size), torch.arange(0, batch_size)], dim=0).to(sim_matrix.device)
 
         # Compute cross-entropy loss
         loss = F.cross_entropy(sim_matrix, labels)
@@ -374,9 +366,9 @@ class ContrastiveEGNNTrainer(Trainer):
         # Padding to `max_nodes`
         pad_length = self.args.max_nodes - len(selected_valid_indices)
         if pad_length > 0:
-            pad_input_ids = torch.full((pad_length,), EGNN_PAD_TOKEN)
-            pad_coords = torch.zeros((pad_length, 3))
-            pad_masks = torch.zeros((pad_length,), dtype=torch.bool)
+            pad_input_ids = torch.full((pad_length,), EGNN_PAD_TOKEN).to(sub_input_ids.device)
+            pad_coords = torch.zeros((pad_length, 3)).to(sub_coords.device)
+            pad_masks = torch.zeros((pad_length,), dtype=torch.bool).to(sub_masks.device)
 
             sub_input_ids = torch.cat([sub_input_ids, pad_input_ids], dim=0)
             sub_coords = torch.cat([sub_coords, pad_coords], dim=0)
@@ -384,42 +376,42 @@ class ContrastiveEGNNTrainer(Trainer):
 
         return sub_input_ids, sub_coords, sub_masks
 
-    def train(self, model, dataset, optimizer, num_epochs=10, batch_size=8, device='cuda'):
-        """
-        Runs training for a specified number of epochs.
+    # def train(self, model, dataset, optimizer, num_epochs=10, batch_size=8, device='cuda'):
+    #     """
+    #     Runs training for a specified number of epochs.
 
-        Args:
-            num_epochs: Number of epochs to train for.
-        """
-        # Move model to device
-        model.to(device)
-        model.train()
+    #     Args:
+    #         num_epochs: Number of epochs to train for.
+    #     """
+    #     # Move model to device
+    #     model.to(device)
+    #     model.train()
 
-        # Create DataLoader
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DataCollatorForEgnnMaskResiduePrediction())
+    #     # Create DataLoader
+    #     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DataCollatorForEgnnMaskResiduePrediction())
 
-        for epoch in range(num_epochs):
-            epoch_loss = 0.0
-            progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+    #     for epoch in range(num_epochs):
+    #         epoch_loss = 0.0
+    #         progress_bar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
 
-            for batch in progress_bar:
-                # Move batch to device
-                # batch = {key: value.to(device) for key, value in batch.items()}
-                # print(batch)
+    #         for batch in progress_bar:
+    #             # Move batch to device
+    #             # batch = {key: value.to(device) for key, value in batch.items()}
+    #             # print(batch)
                 
-                optimizer.zero_grad()  # Reset gradients
+    #             optimizer.zero_grad()  # Reset gradients
                 
-                # Compute loss
-                # loss = compute_loss(model, batch)
-                loss = self.compute_loss(model=model, inputs=batch)
+    #             # Compute loss
+    #             # loss = compute_loss(model, batch)
+    #             loss = self.compute_loss(model=model, inputs=batch)
                 
-                loss.backward()  # Backpropagation
-                optimizer.step()  # Update model parameters
+    #             loss.backward()  # Backpropagation
+    #             optimizer.step()  # Update model parameters
 
-                # Track loss
-                epoch_loss += loss.item()
-                progress_bar.set_postfix(loss=loss.item())
+    #             # Track loss
+    #             epoch_loss += loss.item()
+    #             progress_bar.set_postfix(loss=loss.item())
 
-            print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
+    #         print(f"Epoch {epoch+1}/{num_epochs} - Loss: {epoch_loss / len(dataloader):.4f}")
 
-        print("Training complete!")
+    #     print("Training complete!")

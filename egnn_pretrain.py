@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from models.egnn.egnn import *
-from trainers.trainers import AttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction
+from trainers.trainers import AttributeMaskingTrainer, ContrastiveEGNNTrainer, DataCollatorForEgnnMaskResiduePrediction
 
 
 @dataclass
@@ -33,6 +33,11 @@ class TrainingArguments(transformers.TrainingArguments):
     hidden_dim: int = field(default=512)
     max_amino_acids_sequence_length: int = field(default=768)
     mask_ratio: float = field(default=0.15)
+    subseq_length: int = field(default=50) # For multi-view contrastive learning.
+    temperature: float = field(default=0.01)
+    d: float = field(default=15)
+    max_nodes: int = field(default=50)
+    task: str = field(default='mask_residue_prediction')
     max_grad_norm: str = field(default=1.0)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(
@@ -84,15 +89,23 @@ if __name__ == '__main__':
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
 
-    trainer = AttributeMaskingTrainer(
-        model=net,
-        train_dataset=dataset,
-        args=training_args,
-        data_collator=data_collator,
-    )
+    if training_args.task == 'mask_node_prediction':
+        trainer = AttributeMaskingTrainer(
+            model=net,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=data_collator,
+        )
+    elif training_args.task == 'multi_view_contrastive_learning':
+        trainer = ContrastiveEGNNTrainer(
+            model=net,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=DataCollatorForEgnnMaskResiduePrediction()
+        )
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(net.state_dict(), 'egnn_node.pt')
+        torch.save(net.state_dict(), 'egnn_contrastive.pt')
     
     wandb.finish()
