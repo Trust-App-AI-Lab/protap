@@ -3,8 +3,9 @@ torchrun --nproc_per_node=8  se3transformer_pretrain.py \
     --data_path "./data/swiss-protein-540k-tensor" \
     --bf16 True \
     --output_dir "./checkpoints/se3/" \
-    --run_name 'se3-pretrain-node-test' \
-    --residue_prediction False \
+    --run_name 'se3-pretrain-node-0325' \
+    --residue_prediction True \
+    --hidden_dim 36 \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.0099 \

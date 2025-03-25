@@ -148,20 +148,25 @@ class Se3AttributeMaskingTrainer(Trainer):
         feats = inputs['input_ids']
         
         # Preprocessing for the SE3 Transfofrmer.
-        coords = rearrange(coords, 'b (l s) c -> b l s c', s = 14)
-        # Keeping only the backbone coordinates
-        coords = coords[:, :, 0:3, :]
-        coords = rearrange(coords, 'b l s c -> b (l s) c')
-        feats = repeat(feats, 'b n -> b (n c)', c=3) # Expand the channel.
-        masks = repeat(masks, 'b n -> b (n c)', c=3) # Expand the channel.
+        # coords = rearrange(coords, 'b (l s) c -> b l s c', s = 14)
+        # # Keeping only the backbone coordinates
+        # coords = coords[:, :, 0:3, :]
+        # coords = rearrange(coords, 'b l s c -> b (l s) c')
+        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(feats.shape[-1], device=feats.device)
+        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
         
         inputs = {
-            "feats" : inputs["input_ids"],
+            "feats" : feats,
             "coors" : batch_coords,
-            "mask" : batch_masks
+            "mask" : batch_masks,
+            "adj_mat" : adj_mat,
         }
         
-        pred = model(**inputs)[0]
+        # (batch_size, seq_length, 22)
+        pred = model(**inputs)['0'] # Specify the return type. 
         
         # Gather logits for only the selected masked positions
         selected_indices_tensor = torch.cat(selected_indices_list)  # Flatten into a single tensor
