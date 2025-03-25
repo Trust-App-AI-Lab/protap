@@ -78,20 +78,22 @@ if __name__ == '__main__':
 
     model = SE3Transformer(
         num_tokens = 22,
-        dim = 8,
+        num_positions=training_args.max_amino_acids_sequence_length,
+        dim=training_args.hidden_dim,
         dim_head = 8,
         heads = 2,
         depth = 2,
         attend_self = True,
         input_degrees = 1,
         output_degrees = 2,
-        reduce_dim_out = True,
+        reduce_dim_out = False,
         differentiable_coors = True,
         num_neighbors = 0,
         attend_sparse_neighbors = True,
         num_adj_degrees = 2,
         adj_dim = 4,
         num_degrees=2,
+        residue_prediction=training_args.residue_prediction,
     )
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()

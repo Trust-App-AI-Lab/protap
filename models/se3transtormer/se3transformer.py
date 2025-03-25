@@ -979,7 +979,8 @@ class SE3Transformer(nn.Module):
         egnn_weights_clamp_value = None,
         egnn_feedforward = False,
         hidden_fiber_dict = None,
-        out_fiber_dict = None
+        out_fiber_dict = None,
+        residue_prediction=False,
     ):
         super().__init__()
         dim_in = default(dim_in, dim)
@@ -1120,6 +1121,12 @@ class SE3Transformer(nn.Module):
             final_fiber,
             Fiber(list(map(lambda t: FiberEl(degrees = t[0], dim = 1), final_fiber)))
         ) if reduce_dim_out else None
+        
+        # For masked residue prediction.
+        self.residue_prediction = residue_prediction
+        if self.residue_prediction: 
+            # 20 types of amino acid and one <PAD> token.
+            self.residue_mlp = nn.Linear(in_features=dim, out_features=22)
 
     def forward(
         self,
@@ -1371,5 +1378,9 @@ class SE3Transformer(nn.Module):
 
         if exists(return_type):
             return x[str(return_type)]
+        
+        if self.residue_prediction:
+            x['0'] = self.residue_mlp(x['0']) # (batch_size, seq_length, 22)
+            return x
 
         return x
