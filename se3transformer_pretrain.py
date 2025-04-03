@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from models.se3transtormer.se3transformer import SE3Transformer
-from trainers.trainers import Se3AttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction
+from trainers.trainers import ContrastiveSE3Trainer, Se3AttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction
 
 
 @dataclass
@@ -98,15 +98,23 @@ if __name__ == '__main__':
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
 
-    trainer = Se3AttributeMaskingTrainer(
-        model=model,
-        train_dataset=dataset,
-        args=training_args,
-        data_collator=data_collator,
-    )
+    if training_args.task == 'mask_node_prediction':
+        trainer = Se3AttributeMaskingTrainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=data_collator,
+        )
+    elif training_args.task == 'multi_view_contrastive_learning':
+        trainer = ContrastiveSE3Trainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=data_collator
+        )
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(model.state_dict(), 'se3transformer_node.pt')
+        torch.save(model.state_dict(), 'se3transformer_contrastive.pt')
     
     wandb.finish()
