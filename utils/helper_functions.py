@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from einops import repeat, rearrange
 
 def exists(val):
     return val is not None
@@ -45,3 +46,24 @@ def embedd_token(x, dims, layers):
         stop_concat = x.shape[-1]
         
     return x
+
+def contrastive_graph(inputs):
+    feats = inputs['feats']
+    coors = inputs['coors']
+    masks = inputs['mask']
+    
+    # Preprocessing for the SE3 Transfofrmer.
+    feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+    masks = repeat(masks, 'b n -> b (n c)', c=1) # Expand the channel.
+    
+    i = torch.arange(feats.shape[-1], device=feats.device)
+    adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+    
+    inputs = {
+        "feats" : feats,
+        "coors" : coors,
+        "mask" : masks,
+        "adj_mat" : adj_mat,
+    }
+    
+    return inputs
