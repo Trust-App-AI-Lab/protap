@@ -125,13 +125,3 @@ class EgnnDataset(ProteinDataset):
             'coords': torch.tensor(coords),
             'masks': torch.tensor(masks).bool(),
         }
-        # return {
-        #     'input_ids': input_ids,
-        #     'coords': coords,
-        #     'masks': masks,
-        # }
-        # return {
-        #     "input_ids" : torch.tensor(self.raw_dataset[idx]['input_ids']),
-        #     "coords" : torch.tensor(self.raw_dataset[idx]['coords']),
-        #     "masks" : torch.tensor(self.raw_dataset[idx]["masks"])
-        # }

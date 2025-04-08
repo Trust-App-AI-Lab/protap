@@ -67,3 +67,20 @@ def contrastive_graph(inputs):
     }
     
     return inputs
+
+def masked_mean_pooling(embeddings, masks):
+    """
+    Perform mean pooling over node embeddings while considering valid nodes.
+
+    Args:
+    - embeddings: (batch_size, max_nodes, embedding_dim), node embeddings.
+    - masks: (batch_size, max_nodes), binary mask indicating valid nodes.
+
+    Returns:
+    - graph_embeddings: (batch_size, embedding_dim), pooled graph representation.
+    """
+    masks = masks.float().unsqueeze(-1)  # (batch_size, max_nodes, 1) for broadcasting
+    sum_embeddings = torch.sum(embeddings * masks, dim=1)  # Sum over valid nodes
+    valid_node_count = torch.clamp(masks.sum(dim=1), min=1)  # Avoid division by zero
+    
+    return sum_embeddings / valid_node_count  # Compute mean while ignoring padding

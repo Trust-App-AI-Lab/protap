@@ -14,32 +14,6 @@ class ProteinTokenizer:
         amino_dict=None,
         padding_to_longest=False,
     ):
-        # if dataset == 'egnn-data':
-            # keys: ['name', 'seq', 'coords']
-            # with open('./data/egnn_data/ts50.json', 'r') as json_file:
-            #     self.data = json.load(json_file)
-            # with open('/mnt/data/shuoyan/swiss_20k.json', 'r') as json_file:
-            #     self.data = json.load(json_file)
-            
-            # Complete dataset.
-            # TODO: Load speed is too slow.
-            # if dist.get_rank() == 0:
-            #     print("Loading Json File...")
-            #     with open('/mnt/data/shuoyan/swiss_540k_list.json') as json_file:
-            #         self.data = json.load(json_file)
-            
-            # dist.barrier()
-            
-            # data_list = [self.data] if dist.get_rank() == 0 else [None]
-            # dist.broadcast_object_list(data_list, src=0)
-            
-            # self.data = data_list[0]
-            
-            # self.data = self.data if self.data else [None] * dist.get_world_size()
-            # self.data = self.data[dist.get_rank()]
-            
-            # print("Load Complete!")
-        
         self.data = dataset
             # self.dataset_path = '/mnt/data/shuoyan/swiss_540k_list.json'
                 
