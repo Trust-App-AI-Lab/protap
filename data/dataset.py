@@ -47,6 +47,7 @@ class EgnnDataset(ProteinDataset):
         self,
         tokenizer: ProteinTokenizer,
         generate: bool=False,
+        include_family: bool=True
     ):  
         # Generate the dataset from scrach.
         if generate:
@@ -58,6 +59,7 @@ class EgnnDataset(ProteinDataset):
             
             # Obtain the 3-d C-alpha coordinate.
             self.coords = [] # (n, seq_length, 3)
+            self.family = []
             for protein in tqdm(self.data):
                 coords = protein['coords']
                 x = [coord[1] for coord in coords]  # Extract C-alpha coordinates
@@ -70,19 +72,23 @@ class EgnnDataset(ProteinDataset):
                     x += [[0, 0, 0]] * (self.max_seq_length - len(x))
                 
                 self.coords.append(x)
+                
+                if include_family:
+                    labels = protein['family'] + [-100] * (30 - len(protein['family']))
+                    self.family.append(labels)
             
             
             self.input_ids, self.masks = self.tokenizer.tokenize()
             
-            
             self.dataset = {"input_ids" : self.input_ids,
                             "coords" : self.coords,
                             "masks" : self.masks,
+                            'family' : self.family
                         }
             self.raw_dataset = Dataset.from_dict(self.dataset)
             
             # TODO
-            self.raw_dataset = self.raw_dataset.save_to_disk('swiss-540k-pre-train')
+            self.raw_dataset = self.raw_dataset.save_to_disk('protein_family_1')
         else:
             # self.tokenizer = tokenizer
             # self.sequences = self.tokenizer.sequences

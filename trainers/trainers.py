@@ -11,7 +11,7 @@ from utils.helper_functions import contrastive_graph, masked_mean_pooling
 
 EGNN_MASK_TOKEN = 20 # The <MASK> token is used for residue prediction task.
 EGNN_PAD_TOKEN = 21 # The <PAD> token is used for padding.
-
+FAMILY_NUMBER = 14869
 
 @dataclass
 class DataCollatorForEgnnMaskResiduePrediction(object):
@@ -28,6 +28,24 @@ class DataCollatorForEgnnMaskResiduePrediction(object):
             input_ids=input_ids,
             coords=coords,
             masks=masks,
+        )
+
+@dataclass
+class DataCollatorForEgnnFamilyPrediction(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, family = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "family_labels")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            family=family,
         )
 
 class EgnnAttributeMaskingTrainer(Trainer):
@@ -595,50 +613,77 @@ class EgnnFamilyPredictionTrainer(Trainer):
         Compute loss for a batch using cross entropy loss.
         """
         # model.to("cuda")
-        batch_input_ids, batch_coords, batch_masks = inputs['input_ids'], inputs['coords'], inputs['masks']
+        batch_input_ids, batch_coords, batch_masks, batch_family = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['family']
         
         batch_input_ids = torch.stack(batch_input_ids)
         batch_coords = torch.stack(batch_coords)
         batch_masks = torch.stack(batch_masks)
+        batch_family = torch.stack(batch_family)
         
         batch_size = len(batch_input_ids)
-        target = torch.full_like(batch_input_ids, -100)
         
-        selected_indices_list = []  # To store selected mask indices per batch.
-        masked_input_ids = batch_input_ids.clone()  # Create a copy of input_ids to modify
-
+        # Generate the negetive labels for the family.
+        # print(batch_family)
+        result = batch_family.clone() # (batch_size, 30)
+        first_pad_pos = []
         for i in range(batch_size):
-            # Obtain the indices of the non-padding residues.
-            non_pad_indices = (batch_input_ids[i] != EGNN_PAD_TOKEN).nonzero(as_tuple=True)[0]
-            # According to the mask rate and the length of the aminio acids, get the number of mask which need to be masked.
-            num_to_mask = max(1, int(len(non_pad_indices) * self.args.mask_ratio))
-            mask_indices = torch.randperm(len(non_pad_indices))[:num_to_mask] # (num_to_mask, )
+            row = result[i] # Obtain one row of labels. (30,)
+            mask = row == -100 # -100 represents the padding.
+            num_pad = mask.sum().item()
+            # Store the fistr index of the padding token.
+            idx = (row == -100).nonzero(as_tuple=True)[0]
+            first_pad_pos.append(idx[0].item())
             
-            selected_indices = non_pad_indices[mask_indices] # (num_to_mask, )
-            target[i, selected_indices] = batch_input_ids[i, selected_indices]  # Assign the masked reidues with their labels.
-            # Mask the selected residues with mask token.
-            masked_input_ids[i, selected_indices] = EGNN_MASK_TOKEN
+            # Obtain the positive labels.
+            used = row[row != -100].tolist()
+            used_set = set(used)
             
-            selected_indices_list.append(selected_indices)
+            # Sample the negative labels.
+            available = list(set(range(FAMILY_NUMBER)) - used_set)
+            
+            if len(available) < num_pad:
+                raise ValueError(f"Row {i} has more padding than available values")
+            available_tensor = torch.tensor(available, device=batch_family.device)
+            rand_indices = torch.randperm(len(available_tensor), device=batch_family.device)[:num_pad]
+            sampled_values = available_tensor[rand_indices]
+            
+            row[mask] = sampled_values
         
-        inputs['input_ids'] = masked_input_ids  # Replace the original input_ids with the masked version
-
+        first_pad_pos = torch.tensor(first_pad_pos, device=batch_family.device)
+        first_pad_pos = torch.unsqueeze(first_pad_pos, 1) # (batch_size, 1)
+        
         inputs = {
-            "feats" : inputs["input_ids"],
+            "feats" : batch_input_ids,
             "coors" : batch_coords,
-            "mask" : batch_masks
+            "mask" : batch_masks,
+            "family_labels" : result
         }
         
-        pred = model(**inputs)[0]
+        feats, family_emb = model(**inputs)
+        # Obtain the graph-level representation.
+        graph_repr = masked_mean_pooling(feats, batch_masks) # (batch_size, dim)
         
-        # Gather logits for only the selected masked positions
-        selected_indices_tensor = torch.cat(selected_indices_list)  # Flatten into a single tensor
-        batch_indices = torch.arange(batch_size).repeat_interleave(torch.tensor([len(indices) for indices in selected_indices_list]))
-        
-        masked_logits = pred[batch_indices, selected_indices_tensor].to("cuda")  # (num_total_masked, 22)
-        masked_targets = target[batch_indices, selected_indices_tensor].to("cuda")  # (num_total_masked,)
+        # Normalize embeddings
+        feats = F.normalize(graph_repr, dim=-1)  # (batch_size, dim)
+        family_emb = F.normalize(family_emb, dim=-1)  # (batch_size, 30, dim)
 
-        # Compute cross-entropy loss only on masked residues
-        loss = F.cross_entropy(masked_logits, masked_targets)
+        sim_matrix = torch.einsum('bd, bkd -> bk', feats, family_emb) / self.args.temperature  # (batch_size, 30)
         
+        losses = []
+        for i in range(batch_size):
+            pos_num = first_pad_pos[i].item()
+            logits = sim_matrix[i]
+            
+            # For each positive position
+            for j in range(pos_num):
+                pos_logit = logits[j].unsqueeze(0)  # shape: (1,)
+                # neg_logits = torch.cat([logits[:j], logits[j+1:]], dim=0)  # shape: (29,)
+                neg_logits = logits[pos_num:] 
+                all_logits = torch.cat([pos_logit, neg_logits], dim=0)  # shape: (30,)
+                labels = torch.tensor([0], device=logits.device)
+                loss = F.cross_entropy(all_logits.unsqueeze(0), labels)
+                losses.append(loss)
+
+        loss = torch.stack(losses).mean()
+            
         return loss

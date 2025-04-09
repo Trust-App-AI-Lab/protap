@@ -332,6 +332,7 @@ class EGNN_Network(nn.Module):
         global_linear_attn_dim_head = 64,
         num_global_tokens = 4,
         residue_prediction=False,
+        family_prediction=False,
         **kwargs
     ):
         super().__init__()
@@ -365,8 +366,12 @@ class EGNN_Network(nn.Module):
             
         self.residue_prediction = residue_prediction
         if self.residue_prediction: 
-            # 20 types of amino acid and one <PAD> token.
+            # 20 types of amino acid and one <PAD> token, one <MASK> token.
             self.residue_mlp = nn.Linear(in_features=dim, out_features=22)
+            
+        self.family_prediction = family_prediction
+        if self.family_prediction:
+            self.family_embedding = nn.Embedding(num_embeddings=14869, embedding_dim=dim)
 
     def forward(
         self,
@@ -375,7 +380,8 @@ class EGNN_Network(nn.Module):
         adj_mat = None,
         edges = None,
         mask = None,
-        return_coor_changes = False
+        return_coor_changes = False,
+        family_labels=None,
     ):
         b, device = feats.shape[0], feats.device
 
@@ -431,6 +437,10 @@ class EGNN_Network(nn.Module):
         
         if self.residue_prediction:
             feats = self.residue_mlp(feats) # (batch_size, seq_length, 22)
+        
+        if self.family_prediction:
+            family_embeddings = self.family_embedding(family_labels)
+            return feats, family_embeddings
 
         if return_coor_changes:
             return feats, coors, coor_changes

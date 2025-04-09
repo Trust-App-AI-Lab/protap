@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from models.egnn.egnn import *
-from trainers.trainers import AttributeMaskingTrainer, ContrastiveEGNNTrainer, DataCollatorForEgnnMaskResiduePrediction
+from trainers.trainers import EgnnAttributeMaskingTrainer, ContrastiveEGNNTrainer, EgnnFamilyPredictionTrainer, DataCollatorForEgnnMaskResiduePrediction, DataCollatorForEgnnFamilyPrediction
 
 
 @dataclass
@@ -71,10 +71,15 @@ if __name__ == '__main__':
     dataset = dataset.rename_column('input_ids', 'feats')
     dataset = dataset.rename_column('coords', 'coors')
     dataset = dataset.rename_column('masks', 'mask')
+    if 'family' in dataset.column_names:
+        dataset = dataset.rename_column('family', 'family_labels')
     
     print(len(dataset))
     
     # training_args.max_amino_acids_sequence_length = tokenizer.max_seq_length
+    family_prediction = False
+    if training_args.task == 'family_prediction':
+        family_prediction = True
 
     net = EGNN_Network(
         # num_tokens=tokenizer.amino_numbers,
@@ -85,16 +90,15 @@ if __name__ == '__main__':
         num_nearest_neighbors=8,
         coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
         residue_prediction=training_args.residue_prediction,
+        family_prediction=family_prediction
     )
-    
-    data_collator = DataCollatorForEgnnMaskResiduePrediction()
 
     if training_args.task == 'mask_node_prediction':
-        trainer = AttributeMaskingTrainer(
+        trainer = EgnnAttributeMaskingTrainer(
             model=net,
             train_dataset=dataset,
             args=training_args,
-            data_collator=data_collator,
+            data_collator=DataCollatorForEgnnMaskResiduePrediction(),
         )
     elif training_args.task == 'multi_view_contrastive_learning':
         trainer = ContrastiveEGNNTrainer(
@@ -103,9 +107,16 @@ if __name__ == '__main__':
             args=training_args,
             data_collator=DataCollatorForEgnnMaskResiduePrediction()
         )
+    elif training_args.task == 'family_prediction':
+        trainer = EgnnFamilyPredictionTrainer(
+            model=net,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=DataCollatorForEgnnFamilyPrediction()
+        )
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(net.state_dict(), 'egnn_contrastive.pt')
+        torch.save(net.state_dict(), 'egnn_family.pt')
     
     wandb.finish()
