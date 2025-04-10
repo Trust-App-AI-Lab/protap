@@ -48,6 +48,22 @@ class DataCollatorForEgnnFamilyPrediction(object):
             family=family,
         )
 
+@dataclass
+class DataCollatorProteinBertMaskResiduePrediction(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, masks = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("seq", "mask")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            masks=masks,
+        )
+
 class EgnnAttributeMaskingTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -246,7 +262,6 @@ class ProteinBertAttributeMaskingTrainer(Trainer):
         inputs['input_ids'] = masked_input_ids  # Replace the original input_ids with the masked version
         feats = inputs['input_ids']
         
-        # TODO
         # Generate the GO labels.
         annotation = torch.zeros(batch_size, 1, device=feats.device) # We fixed the GO labels, which means this channel is dropped.
         
