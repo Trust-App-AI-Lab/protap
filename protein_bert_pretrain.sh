@@ -1,22 +1,22 @@
-torchrun --nproc_per_node=8  egnn_pretrain.py \
+torchrun --nproc_per_node=8 --master_port=25376  protein_bert_pretrain.py \
     --model_name_or_path "google-t5/t5-base" \
     --data_path "./data/swiss-protein-540k-tensor" \
     --bf16 True \
     --output_dir "./checkpoints/proteinbert/" \
-    --run_name 'protein-bert-pretrain-node-test' \
+    --run_name 'protein-bert-pretrain-contrastive-0411' \
     --residue_prediction True \
     --subseq_length 50 \
     --max_nodes 50 \
-    --temperature 0.01 \
-    --task 'mask_node_prediction' \
+    --temperature 0.0099 \
+    --task 'multi_view_contrastive_learning' \
     --num_train_epochs 70 \
-    --per_device_train_batch_size 2 \
-    --per_device_eval_batch_size 4 \
+    --per_device_train_batch_size 96 \
+    --per_device_eval_batch_size 48 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 5000 \
     --save_total_limit 1 \
-    --learning_rate 1e-3 \
+    --learning_rate 1e-4 \
     --weight_decay 0. \
     --warmup_ratio 0.05 \
     --lr_scheduler_type "constant_with_warmup" \
