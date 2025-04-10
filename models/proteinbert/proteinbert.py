@@ -254,7 +254,8 @@ class ProteinBERT(nn.Module):
         local_to_global_attn = False,
         local_self_attn = False,
         num_global_tokens = 1,
-        glu_conv = False
+        glu_conv = False,
+        residue_prediction=False,
     ):
         super().__init__()
         self.num_tokens = num_tokens
@@ -271,6 +272,10 @@ class ProteinBERT(nn.Module):
             Reduce('b n d -> b d', 'mean'),
             nn.Linear(dim_global, num_annotation)
         )
+        
+        self.residue_prediction = residue_prediction
+        if self.residue_prediction:
+            self.residue_mlp = nn.Linear(dim, 22)
 
     def forward(self, seq, annotation, mask = None):
         tokens = self.token_emb(seq)
@@ -280,9 +285,15 @@ class ProteinBERT(nn.Module):
 
         for layer in self.layers:
             tokens, annotation = layer(tokens, annotation, mask = mask)
+            
+        if self.residue_prediction:
+            logits = self.residue_mlp(tokens) # (batch_size, seq_length, 22)
+            
+            return logits
 
         tokens = self.to_token_logits(tokens)
         annotation = self.to_annotation_logits(annotation)
+        
         return tokens, annotation
 
 # pretraining wrapper
