@@ -10,7 +10,7 @@ from typing import Optional
 
 # from models.egnn.egnn import *
 from models.proteinbert.proteinbert import *
-from trainers.trainers import ProteinBertAttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction, DataCollatorForEgnnFamilyPrediction, ContrastiveEGNNTrainer, EgnnFamilyPredictionTrainer
+from trainers.trainers import ProteinBertAttributeMaskingTrainer, DataCollatorProteinBertMaskResiduePrediction, DataCollatorForEgnnMaskResiduePrediction, DataCollatorForEgnnFamilyPrediction, ContrastiveEGNNTrainer, EgnnFamilyPredictionTrainer
 
 
 @dataclass
@@ -69,9 +69,10 @@ if __name__ == '__main__':
     # DEBUG
     # dataset = dataset.select(range(0, 96))
     # Rename the column name for training.
-    dataset = dataset.rename_column('input_ids', 'feats')
+    dataset = dataset.rename_column('input_ids', 'seq')
     # dataset = dataset.rename_column('coords', 'coors')
     dataset = dataset.rename_column('masks', 'mask')
+    dataset = dataset.remove_columns('coords')
     if 'family' in dataset.column_names:
         dataset = dataset.rename_column('family', 'family_labels')
     
@@ -96,18 +97,12 @@ if __name__ == '__main__':
         residue_prediction=training_args.residue_prediction,
     )
 
-    seq = torch.randint(0, 21, (2, 2048))
-    mask = torch.ones(2, 2048).bool()
-    annotation = torch.randint(0, 1, (2, 8943)).float()
-
-    seq_logits, annotation_logits = model(seq, annotation, mask = mask) # (2, 2048, 21), (2, 8943)
-
     if training_args.task == 'mask_node_prediction':
         trainer = ProteinBertAttributeMaskingTrainer(
             model=model,
             train_dataset=dataset,
             args=training_args,
-            data_collator=DataCollatorForEgnnMaskResiduePrediction(),
+            data_collator=DataCollatorProteinBertMaskResiduePrediction(),
         )
     elif training_args.task == 'multi_view_contrastive_learning':
         trainer = ContrastiveEGNNTrainer(
