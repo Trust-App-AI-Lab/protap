@@ -277,7 +277,7 @@ class ProteinBERT(nn.Module):
         if self.residue_prediction:
             self.residue_mlp = nn.Linear(dim, 22)
 
-    def forward(self, seq, annotation, mask = None):
+    def forward(self, seq, annotation, mask = None, coors=None):
         tokens = self.token_emb(seq)
 
         annotation = self.to_global_emb(annotation)
@@ -291,7 +291,7 @@ class ProteinBERT(nn.Module):
             
             return logits
 
-        tokens = self.to_token_logits(tokens)
+        # tokens = self.to_token_logits(tokens)
         annotation = self.to_annotation_logits(annotation)
         
         return tokens, annotation
