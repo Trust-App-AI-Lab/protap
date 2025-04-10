@@ -10,7 +10,7 @@ from typing import Optional
 
 # from models.egnn.egnn import *
 from models.proteinbert.proteinbert import *
-from trainers.trainers import ProteinBertAttributeMaskingTrainer, DataCollatorProteinBertMaskResiduePrediction, DataCollatorForEgnnMaskResiduePrediction, DataCollatorForEgnnFamilyPrediction, ContrastiveEGNNTrainer, EgnnFamilyPredictionTrainer
+from trainers.trainers import ProteinBertAttributeMaskingTrainer, ContrastiveProteinBertTrainer, ProteinBertFamilyPredictionTrainer, DataCollatorProteinBertMaskResiduePrediction, DataCollatorProteinBertContrastive, DataCollatorForProteinBertFamilyPrediction
 
 
 @dataclass
@@ -70,9 +70,12 @@ if __name__ == '__main__':
     # dataset = dataset.select(range(0, 96))
     # Rename the column name for training.
     dataset = dataset.rename_column('input_ids', 'seq')
-    # dataset = dataset.rename_column('coords', 'coors')
+    dataset = dataset.rename_column('coords', 'coors')
     dataset = dataset.rename_column('masks', 'mask')
-    dataset = dataset.remove_columns('coords')
+    
+    if training_args.task == 'mask_residue_prediction':
+        dataset = dataset.remove_columns('coords') # We do not use coords for masked residue prediction task.
+        
     if 'family' in dataset.column_names:
         dataset = dataset.rename_column('family', 'family_labels')
     
@@ -88,13 +91,14 @@ if __name__ == '__main__':
         num_annotation=1, # We do not include the GO labels into the training.
         dim=training_args.hidden_dim,
         dim_global=256,
-        depth=6,
+        depth=12,
         narrow_conv_kernel=9,
         wide_conv_kernel=9,
         wide_conv_dilation=5,
         attn_heads=8,
         attn_dim_head=64,
         residue_prediction=training_args.residue_prediction,
+        family_prediction=family_prediction,
     )
 
     if training_args.task == 'mask_node_prediction':
@@ -105,22 +109,22 @@ if __name__ == '__main__':
             data_collator=DataCollatorProteinBertMaskResiduePrediction(),
         )
     elif training_args.task == 'multi_view_contrastive_learning':
-        trainer = ContrastiveEGNNTrainer(
+        trainer = ContrastiveProteinBertTrainer(
             model=model,
             train_dataset=dataset,
             args=training_args,
-            data_collator=DataCollatorForEgnnMaskResiduePrediction()
+            data_collator=DataCollatorProteinBertContrastive(),
         )
     elif training_args.task == 'family_prediction':
-        trainer = EgnnFamilyPredictionTrainer(
+        trainer = ProteinBertFamilyPredictionTrainer(
             model=model,
             train_dataset=dataset,
             args=training_args,
-            data_collator=DataCollatorForEgnnFamilyPrediction()
+            data_collator=DataCollatorForProteinBertFamilyPrediction()
         )
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(model.state_dict(), 'egnn_family.pt')
+        torch.save(model.state_dict(), 'proteinbert_family.pt')
     
     wandb.finish()

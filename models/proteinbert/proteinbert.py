@@ -256,6 +256,7 @@ class ProteinBERT(nn.Module):
         num_global_tokens = 1,
         glu_conv = False,
         residue_prediction=False,
+        family_prediction=False,
     ):
         super().__init__()
         self.num_tokens = num_tokens
@@ -276,8 +277,12 @@ class ProteinBERT(nn.Module):
         self.residue_prediction = residue_prediction
         if self.residue_prediction:
             self.residue_mlp = nn.Linear(dim, 22)
+            
+        self.family_prediction = family_prediction
+        if self.family_prediction:
+            self.family_embedding = nn.Embedding(num_embeddings=14869, embedding_dim=dim)
 
-    def forward(self, seq, annotation, mask = None, coors=None):
+    def forward(self, seq, annotation, mask = None, coors=None, family_labels=None):
         tokens = self.token_emb(seq)
 
         annotation = self.to_global_emb(annotation)
@@ -290,6 +295,11 @@ class ProteinBERT(nn.Module):
             logits = self.residue_mlp(tokens) # (batch_size, seq_length, 22)
             
             return logits
+        
+        if self.family_prediction:
+            family_embedding = self.family_embedding(family_labels)
+            
+            return tokens, family_embedding
 
         # tokens = self.to_token_logits(tokens)
         annotation = self.to_annotation_logits(annotation)
