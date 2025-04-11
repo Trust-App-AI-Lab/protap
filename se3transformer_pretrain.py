@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from models.se3transtormer.se3transformer import SE3Transformer
-from trainers.trainers import ContrastiveSE3Trainer, Se3AttributeMaskingTrainer, DataCollatorForEgnnMaskResiduePrediction
+from trainers.trainers import ContrastiveSE3Trainer, Se3AttributeMaskingTrainer, SE3FamilyPredictionTrainer, DataCollatorForSE3FamilyPrediction, DataCollatorForEgnnMaskResiduePrediction
 
 
 @dataclass
@@ -72,9 +72,16 @@ if __name__ == '__main__':
     dataset = dataset.rename_column('coords', 'coors')
     dataset = dataset.rename_column('masks', 'mask')
     
+    if 'family' in dataset.column_names:
+        dataset = dataset.rename_column('family', 'family_labels')
+    
     print(len(dataset))
     
     # training_args.max_amino_acids_sequence_length = tokenizer.max_seq_length
+    
+    family_prediction = False
+    if training_args.task == 'family_prediction':
+        family_prediction = True
 
     model = SE3Transformer(
         num_tokens = 22,
@@ -94,6 +101,7 @@ if __name__ == '__main__':
         adj_dim = 4,
         num_degrees=2,
         residue_prediction=training_args.residue_prediction,
+        family_prediction=family_prediction,
     )
     
     data_collator = DataCollatorForEgnnMaskResiduePrediction()
@@ -112,9 +120,16 @@ if __name__ == '__main__':
             args=training_args,
             data_collator=data_collator
         )
+    elif training_args.task == 'family_prediction':
+        trainer = SE3FamilyPredictionTrainer(
+            model=model,
+            train_dataset=dataset,
+            args=training_args,
+            data_collator=DataCollatorForSE3FamilyPrediction()
+        )
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(model.state_dict(), 'se3transformer_contrastive.pt')
+        torch.save(model.state_dict(), 'se3transformer_family.pt')
     
     wandb.finish()

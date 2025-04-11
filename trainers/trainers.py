@@ -49,6 +49,24 @@ class DataCollatorForEgnnFamilyPrediction(object):
         )
 
 @dataclass
+class DataCollatorForSE3FamilyPrediction(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, family = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "family_labels")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            family=family,
+        )
+
+@dataclass
 class DataCollatorProteinBertMaskResiduePrediction(object):
     """Collate examples for training EGNN with Maksed Residue Prediction task."""
 
@@ -812,8 +830,114 @@ class EgnnFamilyPredictionTrainer(Trainer):
         loss = torch.stack(losses).mean()
             
         return loss
+
+class SE3FamilyPredictionTrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        # model.to("cuda")
+        batch_input_ids, batch_coords, batch_masks, batch_family = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['family']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        batch_family = torch.stack(batch_family)
+        
+        batch_size = len(batch_input_ids)
+        
+        # Generate the negetive labels for the family.
+        # print(batch_family)
+        result = batch_family.clone() # (batch_size, 30)
+        first_pad_pos = []
+        for i in range(batch_size):
+            row = result[i] # Obtain one row of labels. (30,)
+            mask = row == -100 # -100 represents the padding.
+            num_pad = mask.sum().item()
+            # Store the fistr index of the padding token.
+            idx = (row == -100).nonzero(as_tuple=True)[0]
+            first_pad_pos.append(idx[0].item())
+            
+            # Obtain the positive labels.
+            used = row[row != -100].tolist()
+            used_set = set(used)
+            
+            # Sample the negative labels.
+            available = list(set(range(FAMILY_NUMBER)) - used_set)
+            
+            if len(available) < num_pad:
+                raise ValueError(f"Row {i} has more padding than available values")
+            available_tensor = torch.tensor(available, device=batch_family.device)
+            rand_indices = torch.randperm(len(available_tensor), device=batch_family.device)[:num_pad]
+            sampled_values = available_tensor[rand_indices]
+            
+            row[mask] = sampled_values
+        
+        first_pad_pos = torch.tensor(first_pad_pos, device=batch_family.device)
+        first_pad_pos = torch.unsqueeze(first_pad_pos, 1) # (batch_size, 1)
+        
+        feats = batch_input_ids
+        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(feats.shape[-1], device=feats.device)
+        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        
+        inputs = {
+            "feats" : feats,
+            "coors" : batch_coords,
+            "mask" : batch_masks,
+            "adj_mat" : adj_mat,
+            "family_labels" : result,
+        }
+        
+        feats, family_emb = model(**inputs)
+        # print(family_emb)
+        feats = feats['0']
+        # Obtain the graph-level representation.
+        graph_repr = masked_mean_pooling(feats, batch_masks) # (batch_size, dim)
+        
+        # Normalize embeddings
+        feats = F.normalize(graph_repr, dim=-1)  # (batch_size, dim)
+        family_emb = F.normalize(family_emb, dim=-1)  # (batch_size, 30, dim)
+
+        sim_matrix = torch.einsum('bd, bkd -> bk', feats, family_emb) / self.args.temperature  # (batch_size, 30)
+        
+        losses = []
+        for i in range(batch_size):
+            pos_num = first_pad_pos[i].item()
+            logits = sim_matrix[i]
+            
+            # For each positive position
+            for j in range(pos_num):
+                pos_logit = logits[j].unsqueeze(0)  # shape: (1,)
+                # neg_logits = torch.cat([logits[:j], logits[j+1:]], dim=0)  # shape: (29,)
+                neg_logits = logits[pos_num:] 
+                all_logits = torch.cat([pos_logit, neg_logits], dim=0)  # shape: (30,)
+                labels = torch.tensor([0], device=logits.device)
+                loss = F.cross_entropy(all_logits.unsqueeze(0), labels)
+                losses.append(loss)
+
+        loss = torch.stack(losses).mean()
+            
+        return loss
     
-class ProteinBertFamilyPredictionTrainer(Trainer):
+class ProteinBertFamilyPredictionTrainer(EgnnFamilyPredictionTrainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
 
