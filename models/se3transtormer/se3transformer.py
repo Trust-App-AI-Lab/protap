@@ -981,6 +981,7 @@ class SE3Transformer(nn.Module):
         hidden_fiber_dict = None,
         out_fiber_dict = None,
         residue_prediction=False,
+        family_prediction=False,
     ):
         super().__init__()
         dim_in = default(dim_in, dim)
@@ -1127,6 +1128,11 @@ class SE3Transformer(nn.Module):
         if self.residue_prediction: 
             # 20 types of amino acid and one <PAD> token.
             self.residue_mlp = nn.Linear(in_features=dim, out_features=22)
+            
+        # For family prediction.
+        self.family_prediction = family_prediction
+        if self.family_prediction:
+            self.family_embedding = nn.Embedding(num_embeddings=14869, embedding_dim=dim)
 
     def forward(
         self,
@@ -1138,7 +1144,8 @@ class SE3Transformer(nn.Module):
         return_type = None,
         return_pooled = False,
         neighbor_mask = None,
-        global_feats = None
+        global_feats = None,
+        family_labels=None,
     ):
         assert not (self.accept_global_feats ^ exists(global_feats)), 'you cannot pass in global features unless you init the class correctly'
 
@@ -1382,5 +1389,10 @@ class SE3Transformer(nn.Module):
         if self.residue_prediction:
             x['0'] = self.residue_mlp(x['0']) # (batch_size, seq_length, 22)
             return x
+
+        if self.family_prediction:
+            family_embeddings = self.family_embedding(family_labels)
+            # print(family_embeddings)
+            return x, family_embeddings
 
         return x
