@@ -11,7 +11,6 @@ class ProteinTokenizer:
         self,
         max_seq_length: int,
         dataset,
-        amino_dict=None,
         padding_to_longest=False,
     ):
         self.data = dataset
@@ -38,7 +37,8 @@ class ProteinTokenizer:
         # Build amino acid dictionary
         # Collect unique amino acids from the longest sequence
         # self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[self.max_index]))
-        self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[155]))
+        # self.amino_dict = amino_dict if amino_dict != None else list(set(self.sequences[155]))
+        self.amino_dict = ["D", "F", "H", "N", "A", "I", "V", "M", "E", "G", "K", "Q", "C", "W", "Y", "P", "S", "L", "T", "R"]
         
         self.amino_dict.append('<MASK>') # Add mask token for residue prediction.
         self.amino_dict.append('<PAD>')  # Add padding token to pad the amino sequence to the same length for batch training.
