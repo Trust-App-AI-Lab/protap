@@ -47,7 +47,8 @@ class EgnnDataset(ProteinDataset):
         self,
         tokenizer: ProteinTokenizer,
         generate: bool=False,
-        include_family: bool=True
+        include_family: bool=False,
+        include_drug: bool=False,
     ):  
         # Generate the dataset from scrach.
         if generate:
@@ -77,18 +78,29 @@ class EgnnDataset(ProteinDataset):
                     labels = protein['family'] + [-100] * (30 - len(protein['family']))
                     self.family.append(labels)
             
+            if include_drug:
+                self.drug = self.data['drug']
             
             self.input_ids, self.masks = self.tokenizer.tokenize()
             
-            self.dataset = {"input_ids" : self.input_ids,
-                            "coords" : self.coords,
-                            "masks" : self.masks,
-                            'family' : self.family
-                        }
+            if include_family:
+                self.dataset = {"input_ids" : self.input_ids,
+                                "coords" : self.coords,
+                                "masks" : self.masks,
+                                'family' : self.family
+                            }
+                
+            if include_drug:
+                self.dataset = {"input_ids" : self.input_ids,
+                                "coords" : self.coords,
+                                "masks" : self.masks,
+                                'drug' : self.drug
+                            }
+                
             self.raw_dataset = Dataset.from_dict(self.dataset)
             
             # TODO
-            self.raw_dataset = self.raw_dataset.save_to_disk('protein_family_1')
+            self.raw_dataset = self.raw_dataset.save_to_disk('protein_drug_1')
         else:
             # self.tokenizer = tokenizer
             # self.sequences = self.tokenizer.sequences
