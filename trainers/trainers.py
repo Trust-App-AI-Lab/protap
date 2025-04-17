@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from transformers import Trainer
 from dataclasses import dataclass
+from datasets import load_from_disk
 
 import random
 from typing import Sequence, Dict
@@ -114,6 +115,25 @@ class DataCollatorForProteinBertFamilyPrediction(object):
             input_ids=input_ids,
             masks=masks,
             family=family,
+        )
+
+@dataclass
+class DataCollatorForEgnnPLI(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, drugs, y = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "drugs", "y")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            drugs=drugs,
+            y=y
         )
 
 
@@ -1032,4 +1052,46 @@ class ProteinBertFamilyPredictionTrainer(EgnnFamilyPredictionTrainer):
 
         loss = torch.stack(losses).mean()
             
+        return loss
+
+class EgnnPLITrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        # model.to("cuda")
+        batch_input_ids, batch_coords, batch_masks, batch_drugs, batch_y = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['drugs'], inputs['y']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        batch_drugs = torch.stack(batch_drugs)
+        batch_y = torch.stack(batch_y)
+
+        inputs = {
+            "feats" : batch_input_ids,
+            "coors" : batch_coords,
+            "mask" : batch_masks,
+            "drugs" : batch_drugs,
+        }
+        
+        preds = model(**inputs)
+        
+        loss = F.mse_loss(preds, batch_y)
+        
         return loss

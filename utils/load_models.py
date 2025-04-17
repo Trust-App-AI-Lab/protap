@@ -1,7 +1,7 @@
 import torch
 from collections import OrderedDict
 
-def load_egnn_model(
+def load_pretrain_model(
     model_path: str,
     model: torch.nn.Module
 ):
@@ -14,6 +14,6 @@ def load_egnn_model(
         new_key = k.replace('module', '')
         new_state_dict[new_key] = v
     
-    model.load_state_dict(new_state_dict)
+    model.load_state_dict(new_state_dict, strict=False)
     
     return model
