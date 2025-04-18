@@ -80,6 +80,7 @@ class EgnnDataset(ProteinDataset):
             
             if include_drug:
                 self.drug = self.data['drug']
+                self.y = self.data['y']
             
             self.input_ids, self.masks = self.tokenizer.tokenize()
             
@@ -94,7 +95,8 @@ class EgnnDataset(ProteinDataset):
                 self.dataset = {"input_ids" : self.input_ids,
                                 "coords" : self.coords,
                                 "masks" : self.masks,
-                                'drug' : self.drug
+                                'drug' : self.drug,
+                                'y' : self.y
                             }
                 
             self.raw_dataset = Dataset.from_dict(self.dataset)

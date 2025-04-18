@@ -42,6 +42,7 @@ class TrainingArguments(transformers.TrainingArguments):
     max_nodes: int = field(default=50)
     task: str = field(default='mask_residue_prediction')
     fine_tune: bool = field(default=True)
+    seed: int = field(default=42)
     max_grad_norm: str = field(default=1.0)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(
@@ -59,7 +60,6 @@ class TrainingArguments(transformers.TrainingArguments):
     )
 
 if __name__ == '__main__':
-    set_seed(42)
     os.environ["WANDB_PROJECT"]="protein-pretrain"
     
     parser = transformers.HfArgumentParser(
@@ -67,8 +67,16 @@ if __name__ == '__main__':
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     
+    seed = training_args.seed
+    set_seed(seed=seed)
+    
     print("Loading Dataset...")
+    # TODO
     dataset = load_from_disk(data_args.data_path)
+    split_dataset = dataset.train_test_split(test_size=0.2, seed=seed)
+
+    dataset = split_dataset['train']
+    test_dataset = split_dataset['test']
     # DEBUG
     # dataset = dataset.select(range(0, 96))
     # Rename the column name for training.
@@ -102,7 +110,7 @@ if __name__ == '__main__':
     drug_net = DrugGVPModel()
     
     model = EgnnPLIModel(
-        dim=2 * training_args.hidden_dim,
+        dim=training_args.hidden_dim + 128,
         egnn_model=net,
         drug_model=drug_net,
         freeze_egnn=True,

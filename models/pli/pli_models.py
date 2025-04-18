@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch_geometric.data import Data, Batch
 from datasets import load_from_disk
 
 from data.drug_graph import sdf_to_graphs
@@ -49,21 +50,23 @@ class EgnnPLIModel(nn.Module):
                 coors, 
                 mask, 
                 drugs,
+                y=None,
             ):
 
         feats = self.egnn(
             feats=feats, 
             coors=coors, 
             mask=mask
-        )
+        )[0]
         feats = masked_mean_pooling(feats, mask) # (batch_size, dim)
 
         batch_drugs = []
-        for i in len(feats):
+        for i in range(len(feats)):
             batch_drugs.append(self.drug_graphs[drugs[i].item()])
+        
+        batch_drugs = Batch.from_data_list(batch_drugs).to(feats.device)
 
-        batch_drugs.to(feats.device)
-        drug_output = self.drug_model(batch_drugs) # (batch_size, dim)
+        drug_output = self.drug_model(batch_drugs) # (batch_size, 128)
 
         preds = self.linear(torch.cat((feats, drug_output), 1))
         
