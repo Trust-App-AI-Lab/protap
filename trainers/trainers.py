@@ -1091,6 +1091,7 @@ class EgnnPLITrainer(Trainer):
         }
         
         preds = model(**inputs)
+        batch_y = torch.unsqueeze(batch_y, 1)
         
         loss = F.mse_loss(preds, batch_y)
         

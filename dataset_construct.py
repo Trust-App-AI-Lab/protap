@@ -83,18 +83,21 @@ def generate_pli_dataset():
     coord = []
     seq = []
     drug = []
+    y = []
     for x in tqdm(dataset):
        protein = x['protein_pdb'] # Query the protein coords and seq with the PDB id.
        protein_data = proteins[protein]
        seq.append(protein_data['seq'])
        coords = protein_data['coord']
-    #    coords_ = [coord[1] for coord in coords]
        coord.append(coords)
        drug.append(x['drug']) # Store the drug id for joint training.
+       y.append(x['y']) # Store the target value.
+       
     dataset = {
         'seq' : seq,
         'coords' : coord,
-        'drug' : drug
+        'drug' : drug,
+        'y' : y
     }
     dataset = Dataset.from_dict(dataset)
     # dataset = dataset.add_column(column=seq, name='seq')
@@ -113,28 +116,33 @@ def generate_pli_dataset():
     dataset = load_from_disk('protein_drug_1')
     print(dataset[0])
 
-    input_ids, coords, masks = [], [], []
+    input_ids, coords, masks, y = [], [], [], []
     drugs = []
     for protein in tqdm(dataset):
         input_ids.append(torch.tensor(protein['input_ids']))
         coords.append(torch.tensor(protein['coords']))
         masks.append(torch.tensor(protein['masks']).bool())
         drugs.append(torch.tensor(protein['drug']))
+        y.append(torch.tensor(protein['y']))
 
     input_ids = torch.stack(input_ids)
     coords = torch.stack(coords)
     masks = torch.stack(masks)
     drugs = torch.stack(drugs)
+    y = torch.stack(y)
     dataset = {
         "input_ids" : input_ids,
         "coords" : coords,
         "masks" : masks,
-        "drugs" : drugs
+        "drugs" : drugs,
+        "y" : y
     }
 
     dataset = Dataset.from_dict(dataset)
-    dataset.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'drugs'])
+    dataset.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'drugs', 'y'])
     dataset = dataset.save_to_disk("protein_drug_2")
+    
+    return dataset
 
 def get_drug_graph():
     
@@ -152,12 +160,12 @@ def get_drug_graph():
     
     drug_graphs = sdf_to_graphs(graph_list)
     
-    model = DrugGVPModel()
+    # model = DrugGVPModel()
     
-    for k,v in drug_graphs.items():
-        print(v.edge_v)
-        print(model(v).shape)
-        break
+    # for k,v in drug_graphs.items():
+    #     print(v.edge_v)
+    #     print(model(v).shape)
+    #     break
     
     return drug_graphs
 
@@ -167,7 +175,6 @@ if __name__ == '__main__':
     
     # generate_pretrain_dataset()
     
-    # dataset = generate_pli_dataset()
     # dataset = load_from_disk("protein_drug_2")
     # print(len(dataset))
     # print(dataset[1000])
@@ -180,5 +187,6 @@ if __name__ == '__main__':
     # MVFPIRILVLFALLAFPACVHGAIRKYTFNVVTKQVTRICSTKQIVTVNGKFPGPTIYANEDDTILVNVVNNVKYNVSIHWHGIRQLRTGWADGPAYITQCPIKPGHSYVYNFTVTGQRGTLWWHAHVLWLRATVHGAIVILPKLGLPYPFPKPHREEVIILGEWWKSDTETVVNEALKSGLAPNVSDAHVINGHPGFVPNCPSQGNFKLAVESGKTYMLRLINAALNEELFFKIAGHRFTVVEVDAVYVKPFNTDTILIAPGQTTTALVSAARPSGQYLIAAAPFQDSAVVAVDNRTATATVHYSGTLSATPTKTTSPPPQNATSVANTFVNSLRSLNSKTYPANVPITVDHDLLFTVGLGINRCHSCKAGNFSRVVAAINNITFKMPKTALLQAHYFNLTGIYTTDFPAKPRRVFDFTGKPPSNLATMKATKLYKLPYNSTVQVVLQDTGNVAPENHPIHLHGFNFFVVGLGTGNYNSKKDSNKFNLVDPVERNTVGVPSGGWAAIRFRADNPGVWFMHCHLEVHTTWGLKMAFLVENGKGPNQSIRPPPSDLPKC
     # """
     
-    dataset = get_drug_graph()
-    print(dataset)
+    # dataset = get_drug_graph()
+    dataset = load_from_disk('protein_drug_2')
+    print(dataset[0:3])
