@@ -1,23 +1,25 @@
 torchrun --nproc_per_node=8  egnn_pli.py \
-    --model_name_or_path "google-t5/t5-base" \
-    --data_path "protein_drug_2" \
+    --model_name_or_path './checkpoints/egnn_family.pt' \
+    --data_path "protein_drug_2_clean" \
     --bf16 True \
     --output_dir "./checkpoints/egnn/" \
-    --run_name 'egnn-pli-test' \
+    --run_name 'egnn-pli-0425' \
     --residue_prediction False \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.01 \
-    --num_train_epochs 30 \
+    --num_train_epochs 50 \
+    --seed 42 \
+    --load_pretrain False \
     --per_device_train_batch_size 96 \
     --per_device_eval_batch_size 4 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 5000 \
     --save_total_limit 1 \
-    --learning_rate 1e-2 \
+    --learning_rate 5e-4 \
     --weight_decay 0. \
-    --warmup_ratio 0.05 \
+    --warmup_ratio 0.01 \
     --lr_scheduler_type "constant_with_warmup" \
     --logging_steps 1 \
     --fsdp no_shard \
