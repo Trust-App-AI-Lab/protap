@@ -69,5 +69,6 @@ class EgnnPLIModel(nn.Module):
         drug_output = self.drug_model(batch_drugs) # (batch_size, 128)
 
         preds = self.linear(torch.cat((feats, drug_output), 1))
+        # preds = self.linear(feats)
         
         return preds

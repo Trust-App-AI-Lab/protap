@@ -1065,6 +1065,7 @@ class EgnnPLITrainer(Trainer):
         graph_construction_model (optional): Graph construction model for enhancing graph features
     """
 
+
     def compute_loss(
         self,
         model,
@@ -1089,10 +1090,11 @@ class EgnnPLITrainer(Trainer):
             "mask" : batch_masks,
             "drugs" : batch_drugs,
         }
-        
+        # print("Forward start...", flush=True)
+        # try:
         preds = model(**inputs)
         batch_y = torch.unsqueeze(batch_y, 1)
-        
+
         loss = F.mse_loss(preds, batch_y)
-        
+
         return loss
