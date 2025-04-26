@@ -136,6 +136,24 @@ class DataCollatorForEgnnPLI(object):
             y=y
         )
 
+@dataclass
+class DataCollatorForProteinBERTPLI(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, masks, drugs, y = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("seq", "mask", "drugs", "y")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            masks=masks,
+            drugs=drugs,
+            y=y
+        )
+
 
 class EgnnAttributeMaskingTrainer(Trainer):
     """
@@ -1093,6 +1111,54 @@ class EgnnPLITrainer(Trainer):
         # print("Forward start...", flush=True)
         # try:
         preds = model(**inputs)
+        batch_y = torch.unsqueeze(batch_y, 1)
+
+        loss = F.mse_loss(preds, batch_y)
+
+        return loss
+
+class ProteinBertPLITrainer(EgnnPLITrainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        
+        batch_input_ids, batch_masks, batch_drugs, batch_y = inputs['input_ids'], inputs['masks'], inputs['drugs'], inputs['y']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        # batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        batch_drugs = torch.stack(batch_drugs)
+        batch_y = torch.stack(batch_y)
+        
+        batch_size = len(batch_input_ids)
+        
+        annotation = torch.zeros(batch_size, 1, device=batch_input_ids.device)
+        
+        inputs = {
+            "seq" : batch_input_ids,
+            "mask" : batch_masks,
+            "annotation" : annotation,
+            "drugs" : batch_drugs
+        }
+        
+        preds = model(**inputs)
+        
         batch_y = torch.unsqueeze(batch_y, 1)
 
         loss = F.mse_loss(preds, batch_y)

@@ -72,3 +72,51 @@ class EgnnPLIModel(nn.Module):
         # preds = self.linear(feats)
         
         return preds
+
+
+class ProteinBertPLIModel(nn.Module):
+    def __init__(self, 
+                 dim,
+                 proteinbert_model, 
+                 drug_model,
+                 freeze_bert: bool=False,
+                 ):
+        super().__init__()
+        self.prot_bert = proteinbert_model
+        self.drug_model = drug_model
+        
+        self.linear = nn.Linear(dim, 1)
+        
+        self.drug_graphs = get_drug_graph()
+        
+        if freeze_bert:
+            for param in self.prot_bert.parameters():
+                param.requires_grad = False
+
+    def forward(self, 
+                seq, 
+                mask, 
+                drugs,
+                annotation=None,
+                y=None,
+            ):
+        
+        feats = self.prot_bert(
+            seq=seq, 
+            mask=mask, 
+            annotation=annotation,
+        )[0]
+        feats = masked_mean_pooling(feats, mask) # (batch_size, dim)
+
+        batch_drugs = []
+        for i in range(len(feats)):
+            batch_drugs.append(self.drug_graphs[drugs[i].item()])
+        
+        batch_drugs = Batch.from_data_list(batch_drugs).to(feats.device)
+
+        drug_output = self.drug_model(batch_drugs) # (batch_size, 128)
+
+        preds = self.linear(torch.cat((feats, drug_output), 1))
+        # preds = self.linear(feats)
+        
+        return preds
