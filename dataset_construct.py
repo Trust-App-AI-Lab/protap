@@ -2,8 +2,8 @@ import os
 import json
 from datasets import Dataset, load_from_disk
 
-from data.dataset import EgnnDataset
-from data.tokenizers import ProteinTokenizer
+from data.dataset import EgnnDataset, ProtacDataset
+from data.tokenizers import ProteinTokenizer, ProtacTokenizer
 from data.drug_graph import sdf_to_graphs
 
 import torch
@@ -41,8 +41,8 @@ def generate_pretrain_dataset():
     # dataset = load_dataset('swiss-50k-hf', streaming=True, num_proc=8)
 
     # Tokenize the amino acid sequence.
-    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=dataset, padding_to_longest=False)
-    dataset = EgnnDataset(tokenizer=tokenizer, generate=True, include_family=True)
+    tokenizer = ProtacTokenizer(max_seq_length=768, dataset=dataset, padding_to_longest=False)
+    dataset = EgnnDataset(tokenizer=tokenizer, generate=True)
 
     dataset = load_from_disk('protein_family_1')
     input_ids, coords, masks = [], [], []
@@ -144,6 +144,133 @@ def generate_pli_dataset():
     
     return dataset
 
+def generate_protac_dataset():
+    raw_data = './data/protac_data/protac_clean_structure_label.txt'
+    data = pd.read_csv(raw_data, sep='\t')
+    
+    dataset = Dataset.from_pandas(data)
+    # print(dataset.column_names)
+    dataset = dataset.remove_columns('Unnamed: 0')
+    print(dataset[0:2])
+    
+    # load the protein structure.
+    with open('./data/protac_data/protac_poi_e3ligase_structure.json', 'r') as json_file:
+        proteins = json.load(json_file)
+    
+    poi_seq, poi_coord = [], []
+    e3_ligase_seq, e3_ligase_coord = [], []
+    # warhead, linker, e3_ligand
+    warhead, linker, e3_ligand = [], [], []
+    label = []
+    max_length = 0
+    # Iterate the dataset.
+    for x in tqdm(dataset):
+       # poi, e3_ligase
+        poi_id, e3_ligase_id = x['poi'], x['e3_ligase_structure'] # Obtein the ids.
+        poi, e3_ligase = proteins[poi_id], proteins[e3_ligase_id] # Obtain the structures.
+        poi_seq.append(poi['seq'])
+        poi_coord.append(poi['coords'])
+        e3_ligase_seq.append(e3_ligase['seq'])
+        e3_ligase_coord.append(e3_ligase['coords'])
+        
+        # max_length = max(max_length, len(poi['seq']))
+        # max_length = max(max_length, len(e3_ligase['seq']))
+        
+        warhead.append(x['warhead_sdf'])
+        linker.append(x['linker_sdf'])
+        e3_ligand.append(x['e3_ligand_sdf'])
+
+        label.append(x['protac_label']) # Store the target label.
+       
+    dataset = {
+        'poi_seq' : poi_seq,
+        "poi_coord" : poi_coord,
+        "e3_ligase_seq" : e3_ligase_seq,
+        "e3_ligase_coord" : e3_ligase_coord,
+        "warhead" : warhead,
+        "linker" : linker,
+        "e3_ligand" : e3_ligand,
+        'label' : label
+    }
+    dataset = Dataset.from_dict(dataset)
+    print(dataset[0]) # {'seq', 'coords', 'drug'}
+    print(len(dataset))
+    print(max_length) # 2527
+    
+    # # Tokenize the amino acid sequence.
+    print("Tokenizing the data...")
+    # Padding to the max length: 85.
+    tokenizer = ProtacTokenizer(max_seq_length=768, dataset=dataset, padding_to_longest=False)
+    dataset = ProtacDataset(tokenizer=tokenizer, generate=True)
+    
+    dataset = load_from_disk('protac_1')
+    print(dataset[0])
+
+    poi_input_ids, poi_coords, poi_masks = [], [], []
+    e3_ligase_input_ids, e3_ligase_coords, e3_ligase_masks = [], [], []
+    warhead, linker, e3_ligand = [], [], []
+    label = []
+    
+    def extract(path):
+        underscore_idx = path.rfind('_')
+        dot_idx = path.rfind('.')
+        return int(path[underscore_idx + 1 : dot_idx])
+    
+    for protein in tqdm(dataset):
+        poi_input_ids.append(torch.tensor(protein['poi_input_ids']))
+        poi_coords.append(torch.tensor(protein['poi_coords']))
+        poi_masks.append(torch.tensor(protein['poi_masks']).bool())
+        e3_ligase_input_ids.append(torch.tensor(protein['e3_ligase_input_ids']))
+        e3_ligase_coords.append(torch.tensor(protein['e3_ligase_coords']))
+        e3_ligase_masks.append(torch.tensor(protein['e3_ligase_masks']).bool())
+        warhead.append(torch.tensor(extract(protein['warhead'])))
+        linker.append(torch.tensor(extract(protein['linker'])))
+        e3_ligand.append(torch.tensor(extract(protein['e3_ligand'])))
+        label.append(torch.tensor(protein['label']))
+
+    poi_input_ids = torch.stack(poi_input_ids)
+    poi_coords = torch.stack(poi_coords)
+    poi_masks = torch.stack(poi_masks)
+    e3_ligase_input_ids = torch.stack(e3_ligase_input_ids)
+    e3_ligase_coords = torch.stack(e3_ligase_coords)
+    e3_ligase_masks = torch.stack(e3_ligase_masks)
+    warhead = torch.stack(warhead)
+    linker = torch.stack(linker)
+    e3_ligand = torch.stack(e3_ligand)
+    label = torch.stack(label)
+    
+    dataset = {
+        "poi_input_ids": poi_input_ids,
+        "poi_coords": poi_coords,
+        "poi_masks": poi_masks,
+        "e3_ligase_input_ids": e3_ligase_input_ids,
+        "e3_ligase_coords": e3_ligase_coords,
+        "e3_ligase_masks": e3_ligase_masks,
+        "warhead": warhead,
+        "linker": linker,
+        "e3_ligand": e3_ligand,
+        "label": label,
+    }
+
+    dataset = Dataset.from_dict(dataset)
+    
+    dataset.set_format(type='torch', columns=[
+        'poi_input_ids', 
+        'poi_coords', 
+        'poi_masks', 
+        'e3_ligase_input_ids', 
+        'e3_ligase_coords', 
+        'e3_ligase_masks', 
+        'warhead', 
+        'linker', 
+        'e3_ligand', 
+        'label'
+    ])
+    
+    dataset = dataset.save_to_disk("protac_2")
+    
+    return dataset
+
 def get_drug_graph():
     
     dataset = load_from_disk("protein_drug_1") # {input_ids, coords, masks, drugs}
@@ -159,13 +286,6 @@ def get_drug_graph():
         graph_list[drug_id] = data_dir
     
     drug_graphs = sdf_to_graphs(graph_list)
-    
-    # model = DrugGVPModel()
-    
-    # for k,v in drug_graphs.items():
-    #     print(v.edge_v)
-    #     print(model(v).shape)
-    #     break
     
     return drug_graphs
 
@@ -188,5 +308,13 @@ if __name__ == '__main__':
     # """
     
     # dataset = get_drug_graph()
-    dataset = load_from_disk('protein_drug_2')
-    print(dataset[0:3])
+    # dataset = load_from_disk('protein_drug_2')
+    # print(dataset[0:3])
+    
+    
+    # generate_protac_dataset()
+    dataset = load_from_disk('protac_2')
+    print(dataset[0])
+    print(dataset[0]['warhead'])
+    print(dataset[100]['warhead'])
+    print(dataset[1000]['warhead'])
