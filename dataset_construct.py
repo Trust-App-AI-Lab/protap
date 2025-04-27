@@ -313,7 +313,7 @@ if __name__ == '__main__':
     
     
     # generate_protac_dataset()
-    dataset = load_from_disk('protac_2')
+    dataset = load_from_disk('./data/protac_1')
     print(dataset[0])
     print(dataset[0]['warhead'])
     print(dataset[100]['warhead'])
