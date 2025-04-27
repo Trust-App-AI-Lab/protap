@@ -73,7 +73,6 @@ class EgnnPLIModel(nn.Module):
         
         return preds
 
-
 class ProteinBertPLIModel(nn.Module):
     def __init__(self, 
                  dim,
