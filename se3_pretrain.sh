@@ -1,15 +1,15 @@
-torchrun --nproc_per_node=8  se3transformer_pretrain.py \
+torchrun --nproc_per_node=8  --master_port=34793 se3_pretrain.py \
     --model_name_or_path "google-t5/t5-base" \
-    --data_path "./data/swiss-protein-540k-tensor" \
+    --data_path "./data/protein_family_2" \
     --bf16 True \
     --output_dir "./checkpoints/se3/" \
-    --run_name 'se3-pretrain-node-0325' \
-    --residue_prediction True \
+    --run_name 'se3-pretrain-family-0421' \
+    --residue_prediction False \
     --hidden_dim 36 \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.0099 \
-    --task 'mask_node_prediction' \
+    --task 'family_prediction' \
     --num_train_epochs 70 \
     --per_device_train_batch_size 48 \
     --per_device_eval_batch_size 4 \

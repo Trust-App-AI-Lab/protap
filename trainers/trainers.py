@@ -197,6 +197,30 @@ class DataCollatorForEgnnProtac(object):
             label=label,
         )
 
+@dataclass
+class DataCollatorForSe3Protac(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        poi_input_ids, poi_coords, poi_masks, e3_ligase_input_ids, e3_ligase_coords, e3_ligase_masks, warhead, linker, e3_ligand, label = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ('poi_input_ids', 'poi_coords', 'poi_masks', 'e3_ligase_input_ids', 'e3_ligase_coords', 'e3_ligase_masks', 'warhead', 'linker', 'e3_ligand', 'label')
+        )
+        
+        return dict(
+            poi_input_ids=poi_input_ids,
+            poi_coords=poi_coords,
+            poi_masks=poi_masks,
+            e3_ligase_input_ids=e3_ligase_input_ids,
+            e3_ligase_coords=e3_ligase_coords,
+            e3_ligase_masks=e3_ligase_masks,
+            warhead=warhead,
+            linker=linker,
+            e3_ligand=e3_ligand,
+            label=label,
+        )
+
 class EgnnAttributeMaskingTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -1307,6 +1331,79 @@ class EgnnProtacTrainer(Trainer):
             "linker": batch_linker,
             "e3_ligand": batch_e3_ligand,
             "label": batch_label,
+        }
+
+        logits = model(**inputs)
+
+        loss = F.cross_entropy(logits, batch_label)
+
+        return loss
+
+class Se3ProtacTrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        batch_poi_input_ids, batch_e3_ligase_input_ids = inputs['poi_input_ids'], inputs['e3_ligase_input_ids']
+        batch_poi_coords, batch_e3_ligase_coords = inputs['poi_coords'], inputs['e3_ligase_coords']
+        batch_poi_masks, batch_e3_ligase_masks = inputs['poi_masks'], inputs['e3_ligase_masks']
+        batch_warhead, batch_linker, batch_e3_ligand = inputs['warhead'], inputs['linker'], inputs['e3_ligand']
+        batch_label = inputs['label']
+        
+        batch_poi_input_ids = torch.stack(batch_poi_input_ids)
+        batch_e3_ligase_input_ids = torch.stack(batch_e3_ligase_input_ids)
+        batch_poi_coords = torch.stack(batch_poi_coords)
+        batch_e3_ligase_coords = torch.stack(batch_e3_ligase_coords)
+        batch_poi_masks = torch.stack(batch_poi_masks)
+        batch_e3_ligase_masks = torch.stack(batch_e3_ligase_masks)
+        batch_warhead = torch.stack(batch_warhead)
+        batch_linker = torch.stack(batch_linker)
+        batch_e3_ligand = torch.stack(batch_e3_ligand)
+        batch_label = torch.stack(batch_label)
+        
+        poi_feats = batch_poi_input_ids
+        poi_feats = repeat(poi_feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_poi_masks = repeat(batch_poi_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(poi_feats.shape[-1], device=poi_feats.device)
+        poi_adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        
+        e3_ligase_feats = batch_e3_ligase_input_ids
+        e3_ligase_feats = repeat(e3_ligase_feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_e3_ligase_masks = repeat(batch_e3_ligase_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(e3_ligase_feats.shape[-1], device=e3_ligase_feats.device)
+        e3_ligase_adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+
+        inputs = {
+            "poi_input_ids": poi_feats,
+            "poi_coords": batch_poi_coords,
+            "poi_masks": batch_poi_masks,
+            "e3_ligase_input_ids": e3_ligase_feats,
+            "e3_ligase_coords": batch_e3_ligase_coords,
+            "e3_ligase_masks": batch_e3_ligase_masks,
+            "warhead": batch_warhead,
+            "linker": batch_linker,
+            "e3_ligand": batch_e3_ligand,
+            "label": batch_label,
+            "poi_adj_mat" : poi_adj_mat,
+            "e3_ligase_adj_mat" : e3_ligase_adj_mat
         }
 
         logits = model(**inputs)

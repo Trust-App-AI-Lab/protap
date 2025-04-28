@@ -9,6 +9,7 @@ from datasets import load_from_disk
 from dataclasses import dataclass, field
 from typing import Optional
 from tqdm import tqdm
+import torch.distributed as dist
 
 from models.egnn.egnn import *
 from models.drug_gvp.drug_gvp import DrugGVPModel
@@ -119,7 +120,8 @@ if __name__ == '__main__':
         # dim=training_args.hidden_dim,
         egnn_model=egnn,
         drug_model=drug_net,
-        freeze_egnn=training_args.load_pretrain
+        # freeze_egnn=training_args.load_pretrain
+        freeze_egnn=False
     )
     
     for name, param in model.named_parameters():
@@ -179,5 +181,7 @@ if __name__ == '__main__':
     
     print("MSE:", mse_result['mse'])
     print("Pearson r:", pearson_result['pearsonr'])
+    
+    dist.destroy_process_group()
     
     wandb.finish()

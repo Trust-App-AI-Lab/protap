@@ -76,12 +76,8 @@ if __name__ == '__main__':
     set_seed(seed=seed)
     
     print("Loading Dataset...")
-    # TODO
     dataset = load_from_disk(data_args.data_path)
-    # Rename the column name for training.
-    # dataset = dataset.rename_column('input_ids', 'feats')
-    # dataset = dataset.rename_column('coords', 'coors')
-    # dataset = dataset.rename_column('masks', 'mask')
+
     split_dataset = dataset.train_test_split(test_size=0.2, seed=seed)
 
     dataset = split_dataset['train']
@@ -121,7 +117,7 @@ if __name__ == '__main__':
         poi_ligase_model=egnn,
         warhead_ligand_model=warhead_ligase_net,
         linker_model=linker_net,
-        freeze_encoder=False
+        freeze_encoder=True
     )
         
     for name, param in model.named_parameters():
@@ -140,47 +136,64 @@ if __name__ == '__main__':
     #     torch.save(model.state_dict(), 'egnn_node_pli.pt')
         
     # Evaluation.
-    # print("Strat evaluation...")
-    # # modeo = model.to("cuda")
-    # model.eval()
-    # test_loader = DataLoader(
-    #     test_dataset,
-    #     batch_size=96,
-    #     shuffle=True,
-    #     collate_fn=DataCollatorForEgnnPLI(),
-    #     # num_workers=4
-    # )
-    # yt, yp = torch.Tensor(), torch.Tensor()
-    # with torch.no_grad():
-    #     for step, inputs in tqdm(enumerate(test_loader)):
+    print("Strat evaluation...")
+    # modeo = model.to("cuda")
+    model.eval()
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=96,
+        shuffle=True,
+        collate_fn=DataCollatorForEgnnProtac(),
+    )
+    yt, yp = [], []
+    with torch.no_grad():
+        for step, inputs in tqdm(enumerate(test_loader)):
             
-    #         batch_input_ids, batch_coords, batch_masks, batch_drugs, batch_y = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['drugs'], inputs['y']
-        
-    #         batch_input_ids = torch.stack(batch_input_ids).to("cuda")
-    #         batch_coords = torch.stack(batch_coords).to("cuda")
-    #         batch_masks = torch.stack(batch_masks).to("cuda")
-    #         batch_drugs = torch.stack(batch_drugs).to("cuda")
-    #         batch_y = torch.stack(batch_y)
+            batch_poi_input_ids, batch_e3_ligase_input_ids = inputs['poi_input_ids'], inputs['e3_ligase_input_ids']
+            batch_poi_coords, batch_e3_ligase_coords = inputs['poi_coords'], inputs['e3_ligase_coords']
+            batch_poi_masks, batch_e3_ligase_masks = inputs['poi_masks'], inputs['e3_ligase_masks']
+            batch_warhead, batch_linker, batch_e3_ligand = inputs['warhead'], inputs['linker'], inputs['e3_ligand']
+            batch_label = inputs['label']
+            
+            batch_poi_input_ids = torch.stack(batch_poi_input_ids).to("cuda")
+            batch_e3_ligase_input_ids = torch.stack(batch_e3_ligase_input_ids).to("cuda")
+            batch_poi_coords = torch.stack(batch_poi_coords).to("cuda")
+            batch_e3_ligase_coords = torch.stack(batch_e3_ligase_coords).to("cuda")
+            batch_poi_masks = torch.stack(batch_poi_masks).to("cuda")
+            batch_e3_ligase_masks = torch.stack(batch_e3_ligase_masks).to("cuda")
+            batch_warhead = torch.stack(batch_warhead).to("cuda")
+            batch_linker = torch.stack(batch_linker).to("cuda")
+            batch_e3_ligand = torch.stack(batch_e3_ligand).to("cuda")
+            batch_label = torch.stack(batch_label)
 
-    #         inputs = {
-    #             "feats" : batch_input_ids,
-    #             "coors" : batch_coords,
-    #             "mask" : batch_masks,
-    #             "drugs" : batch_drugs,
-    #         }
-    #         y = batch_y
-    #         yh = model(**inputs)
-    #         yp = torch.cat([yp, yh.detach().cpu()], dim=0)
-    #         yt = torch.cat([yt, y.detach().cpu()], dim=0)
+            inputs = {
+                "poi_input_ids": batch_poi_input_ids,
+                "poi_coords": batch_poi_coords,
+                "poi_masks": batch_poi_masks,
+                "e3_ligase_input_ids": batch_e3_ligase_input_ids,
+                "e3_ligase_coords": batch_e3_ligase_coords,
+                "e3_ligase_masks": batch_e3_ligase_masks,
+                "warhead": batch_warhead,
+                "linker": batch_linker,
+                "e3_ligand": batch_e3_ligand,
+                "label": batch_label,
+            }
+
+            logits = model(**inputs)
+            prob = torch.softmax(logits, dim=1)[:, 1] # obtain the positive label's probability.
+            pred_label = torch.argmax(logits, dim=1)
+
+            yt.append(batch_label.cpu())
+            yp.append(prob.cpu())
     
-    # yt = yt.numpy()
-    # yp = yp.view(-1).numpy()
+    yt = torch.cat(yt, dim=0).numpy()
+    yp = torch.cat(yp, dim=0).numpy()
     
-    # mse_result = eval_mse(yt, yp)
-    # pearson_result = eval_pearson(yt, yp)
+    acc_result = eval_accuray(yt, (yp > 0.5).astype(int))
+    auc_result = eval_auc_score(yt, yp)
     
-    # print("MSE:", mse_result['mse'])
-    # print("Pearson r:", pearson_result['pearsonr'])
+    print("Accuracy:", acc_result)
+    print("AUC:", auc_result)
     
     dist.destroy_process_group()
     
