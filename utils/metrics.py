@@ -1,4 +1,5 @@
 import evaluate
+from sklearn.metrics import roc_auc_score, accuracy_score
 
 def eval_mse(y_true, y_pred):
     """Evaluate mse/rmse and return the results.
@@ -14,3 +15,11 @@ def eval_pearson(y_true, y_pred):
     pearson_metric = evaluate.load("pearsonr")
     
     return pearson_metric.compute(predictions=y_pred, references=y_true)
+
+def eval_auc_score(y_true, y_pred):
+    
+    return roc_auc_score(y_true, y_pred)
+
+def eval_accuray(y_true, y_pred):
+    
+    return accuracy_score(y_true, y_pred)
