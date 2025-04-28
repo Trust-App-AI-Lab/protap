@@ -1,14 +1,13 @@
-torchrun --nproc_per_node=8 --master_port=23333 se3_protac.py \
-    --model_name_or_path './checkpoints/se3_contrastive.pt' \
+torchrun --nproc_per_node=8 --master_port=23333 proteinbert_protac.py \
+    --model_name_or_path './checkpoints/proteinbert_contrastive.pt' \
     --data_path "./data/protac_2" \
     --bf16 True \
     --output_dir "./checkpoints/egnn/" \
-    --run_name 'se3-protac-0428' \
-    --hidden_dim 36 \
+    --run_name 'proteinbert-protac-0428' \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.01 \
-    --num_train_epochs 50 \
+    --num_train_epochs 1 \
     --seed 42 \
     --load_pretrain False \
     --per_device_train_batch_size 24 \
