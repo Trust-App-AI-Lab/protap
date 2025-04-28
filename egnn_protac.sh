@@ -1,16 +1,16 @@
-CUDA_VISIBLE_DEVICES=2,3,4,5,6,7 torchrun --nproc_per_node=6  egnn_protac.py \
+torchrun --nproc_per_node=8 --master_port=23333 egnn_protac.py \
     --model_name_or_path './checkpoints/egnn_contrastive.pt' \
     --data_path "./data/protac_2" \
     --bf16 True \
     --output_dir "./checkpoints/egnn/" \
-    --run_name 'egnn-protac-0427' \
+    --run_name 'egnn-protac-cl-0428' \
     --residue_prediction False \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.01 \
     --num_train_epochs 50 \
-    --seed 42 \
-    --load_pretrain False \
+    --seed 1024 \
+    --load_pretrain True \
     --per_device_train_batch_size 24 \
     --per_device_eval_batch_size 4 \
     --evaluation_strategy "no" \

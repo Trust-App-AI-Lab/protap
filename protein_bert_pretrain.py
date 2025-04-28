@@ -125,6 +125,6 @@ if __name__ == '__main__':
     
     trainer.train()
     if dist.get_rank() == 0:
-        torch.save(model.state_dict(), 'proteinbert_contrastive.pt')
+        torch.save(model.state_dict(), 'proteinbert_family.pt')
     
     wandb.finish()

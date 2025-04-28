@@ -1,13 +1,13 @@
-torchrun --nproc_per_node=8 --master_port=35376  protein_bert_pretrain.py \
+torchrun --nproc_per_node=8 --master_port=65376  protein_bert_pretrain.py \
     --model_name_or_path "google-t5/t5-base" \
     --data_path "./data/protein_family_2" \
     --bf16 True \
     --output_dir "./checkpoints/proteinbert/" \
-    --run_name 'protein-bert-pretrain-family-0411' \
+    --run_name 'protein-bert-pretrain-family-0418' \
     --residue_prediction False \
     --subseq_length 50 \
     --max_nodes 50 \
-    --temperature 0.01 \
+    --temperature 0.0099 \
     --task 'family_prediction' \
     --num_train_epochs 70 \
     --per_device_train_batch_size 48 \

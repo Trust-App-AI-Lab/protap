@@ -1,6 +1,6 @@
 torchrun --nproc_per_node=8  proteinbert_pli.py \
     --model_name_or_path './checkpoints/proteinbert_contrastive.pt' \
-    --data_path "protein_drug_2_clean" \
+    --data_path "./data/protein_drug_2_clean" \
     --bf16 True \
     --output_dir "./checkpoints/egnn/" \
     --run_name 'proteinbert-pli-cl-0426' \

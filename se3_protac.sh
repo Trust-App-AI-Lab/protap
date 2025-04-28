@@ -1,17 +1,17 @@
-torchrun --nproc_per_node=8  egnn_pli.py \
-    --model_name_or_path './checkpoints/egnn_contrastive.pt' \
-    --data_path "./data/protein_drug_2_clean" \
+torchrun --nproc_per_node=8 --master_port=23333 se3_protac.py \
+    --model_name_or_path './checkpoints/se3_contrastive.pt' \
+    --data_path "./data/protac_2" \
     --bf16 True \
     --output_dir "./checkpoints/egnn/" \
-    --run_name 'egnn-pli-cl-0425' \
-    --residue_prediction False \
+    --run_name 'se3-protac-0428' \
+    --hidden_dim 36 \
     --subseq_length 50 \
     --max_nodes 50 \
     --temperature 0.01 \
-    --num_train_epochs 50 \
-    --seed 1024 \
+    --num_train_epochs 1 \
+    --seed 42 \
     --load_pretrain False \
-    --per_device_train_batch_size 96 \
+    --per_device_train_batch_size 24 \
     --per_device_eval_batch_size 4 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
@@ -22,4 +22,3 @@ torchrun --nproc_per_node=8  egnn_pli.py \
     --warmup_ratio 0.01 \
     --lr_scheduler_type "constant_with_warmup" \
     --logging_steps 1 \
-    # --fsdp no_shard \

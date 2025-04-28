@@ -107,3 +107,71 @@ class EgnnProtacModel(nn.Module):
         logits = self.linear(torch.cat((poi_feats, e3_ligase_feats, warhead_feats, linker_feats, e3_ligand_feats), 1))
         
         return logits
+
+class Se3ProtacModel(nn.Module):
+    def __init__(self, 
+                 dim,
+                 poi_ligase_model,
+                 warhead_ligand_model,
+                 linker_model,
+                 freeze_encoder: bool=False,
+                 ):
+        super().__init__()
+        self.encoder = poi_ligase_model # Encode the poi and e3 ligase.
+        self.warhead_ligand_encoder = warhead_ligand_model # Encode the warhead and e3 ligand.
+        self.linker_encoder = linker_model # Encode the linker.
+        
+        self.linear = nn.Linear(dim, 2) # Binary classification.
+        
+        self.warhead_graphs, self.linker_graphs, self.e3_ligase_graphs = get_protac_graph()
+        
+        if freeze_encoder:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+
+    def forward(self, 
+            poi_input_ids,
+            poi_coords,
+            poi_masks,
+            e3_ligase_input_ids,
+            e3_ligase_coords,
+            e3_ligase_masks,
+            warhead,
+            linker,
+            e3_ligand,
+            poi_adj_mat=None,
+            e3_ligase_adj_mat=None,
+            label=None,
+        ):
+
+        poi_feats = self.encoder(
+            feats=poi_input_ids, 
+            coors=poi_coords, 
+            mask=poi_masks,
+            adj_mat=poi_adj_mat
+        )['0']
+        poi_feats = masked_mean_pooling(poi_feats, poi_masks) # (batch_size, dim)
+        
+        e3_ligase_feats = self.encoder(
+            feats=e3_ligase_input_ids,
+            coors=e3_ligase_coords,
+            mask=e3_ligase_masks,
+            adj_mat=e3_ligase_adj_mat
+        )['0']
+        e3_ligase_feats = masked_mean_pooling(e3_ligase_feats, e3_ligase_masks)
+        
+        batch_warheads, batch_linkers, batch_e3_ligands = [], [], []
+        for i in range(len(poi_feats)):
+            batch_warheads.append(self.warhead_graphs[str(warhead[i].item())])
+            batch_linkers.append(self.linker_graphs[str(linker[i].item())])
+            batch_e3_ligands.append(self.e3_ligase_graphs[str(e3_ligand[i].item())])
+        
+        batch_warheads, batch_linkers, batch_e3_ligands = Batch.from_data_list(batch_warheads).to(poi_feats.device), Batch.from_data_list(batch_linkers).to(poi_feats.device), Batch.from_data_list(batch_e3_ligands).to(poi_feats.device)
+        
+        warhead_feats = self.warhead_ligand_encoder(batch_warheads) # (batch_size, 128)
+        e3_ligand_feats = self.warhead_ligand_encoder(batch_e3_ligands)
+        linker_feats = self.linker_encoder(batch_linkers)
+
+        logits = self.linear(torch.cat((poi_feats, e3_ligase_feats, warhead_feats, linker_feats, e3_ligand_feats), 1))
+        
+        return logits
