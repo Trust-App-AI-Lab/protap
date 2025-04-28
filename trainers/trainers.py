@@ -137,6 +137,25 @@ class DataCollatorForEgnnPLI(object):
         )
 
 @dataclass
+class DataCollatorForSe3PLI(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, drugs, y = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "drugs", "y")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            drugs=drugs,
+            y=y
+        )
+
+@dataclass
 class DataCollatorForProteinBERTPLI(object):
     """Collate examples for training EGNN with Maksed Residue Prediction task."""
 
@@ -1140,6 +1159,57 @@ class EgnnPLITrainer(Trainer):
 
         return loss
 
+class Se3PLITrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        # model.to("cuda")
+        batch_input_ids, batch_coords, batch_masks, batch_drugs, batch_y = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['drugs'], inputs['y']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        batch_drugs = torch.stack(batch_drugs)
+        batch_y = torch.stack(batch_y)
+        
+        feats = batch_input_ids
+        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(feats.shape[-1], device=feats.device)
+        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        
+        inputs = {
+            "feats" : feats,
+            "coors" : batch_coords,
+            "mask" : batch_masks,
+            "adj_mat" : adj_mat,
+            "drugs" : batch_drugs,
+        }
+        
+        preds = model(**inputs)
+        batch_y = torch.unsqueeze(batch_y, 1)
+
+        loss = F.mse_loss(preds, batch_y)
+
+        return loss
+
 class ProteinBertPLITrainer(EgnnPLITrainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -1209,7 +1279,6 @@ class EgnnProtacTrainer(Trainer):
         """
         Compute loss for a batch using cross entropy loss.
         """
-        # model.to("cuda")
         batch_poi_input_ids, batch_e3_ligase_input_ids = inputs['poi_input_ids'], inputs['e3_ligase_input_ids']
         batch_poi_coords, batch_e3_ligase_coords = inputs['poi_coords'], inputs['e3_ligase_coords']
         batch_poi_masks, batch_e3_ligase_masks = inputs['poi_masks'], inputs['e3_ligase_masks']
