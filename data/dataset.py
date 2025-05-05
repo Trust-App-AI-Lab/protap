@@ -49,6 +49,8 @@ class EgnnDataset(ProteinDataset):
         generate: bool=False,
         include_family: bool=False,
         include_drug: bool=False,
+        include_go: bool=False,
+        save_dir=None,
     ):  
         # Generate the dataset from scrach.
         if generate:
@@ -61,6 +63,7 @@ class EgnnDataset(ProteinDataset):
             # Obtain the 3-d C-alpha coordinate.
             self.coords = [] # (n, seq_length, 3)
             self.family = []
+            self.go = []
             for protein in tqdm(self.data):
                 coords = protein['coords']
                 x = [coord[1] for coord in coords]  # Extract C-alpha coordinates
@@ -82,6 +85,9 @@ class EgnnDataset(ProteinDataset):
                 self.drug = self.data['drug']
                 self.y = self.data['y']
             
+            if include_go:
+                self.go = self.data['go']
+            
             self.input_ids, self.masks = self.tokenizer.tokenize()
             
             if include_family:
@@ -98,11 +104,22 @@ class EgnnDataset(ProteinDataset):
                                 'drug' : self.drug,
                                 'y' : self.y
                             }
+            
+            if include_go:
+                self.dataset = {
+                    "input_ids" : self.input_ids,
+                    "coords" : self.coords,
+                    "masks" : self.masks,
+                    "go" : self.go
+                }
                 
             self.raw_dataset = Dataset.from_dict(self.dataset)
             
             # TODO
-            self.raw_dataset = self.raw_dataset.save_to_disk('protein_drug_1')
+            if save_dir:
+                self.raw_dataset = self.raw_dataset.save_to_disk(save_dir)
+            else:
+                self.raw_dataset = self.raw_dataset.save_to_disk('biological_process_1')
         else:
             # self.tokenizer = tokenizer
             # self.sequences = self.tokenizer.sequences

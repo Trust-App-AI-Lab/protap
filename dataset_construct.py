@@ -9,12 +9,10 @@ from data.drug_graph import sdf_to_graphs
 import torch
 from tqdm import tqdm
 import pandas as pd
-
-from models.drug_gvp.drug_gvp import DrugGVPModel
+import numpy as np
 
 def generate_pretrain_dataset():
     raw_data = '/mnt/data/protein_data/swiss_540k_family_index_list.json'
-    # raw_data = '/mnt/data/shuoyan/swiss_540k_list.json'
 
     with open(raw_data) as json_file:
         data = json.load(json_file)
@@ -41,7 +39,7 @@ def generate_pretrain_dataset():
     # dataset = load_dataset('swiss-50k-hf', streaming=True, num_proc=8)
 
     # Tokenize the amino acid sequence.
-    tokenizer = ProtacTokenizer(max_seq_length=768, dataset=dataset, padding_to_longest=False)
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=dataset, padding_to_longest=False)
     dataset = EgnnDataset(tokenizer=tokenizer, generate=True)
 
     dataset = load_from_disk('protein_family_1')
@@ -271,6 +269,126 @@ def generate_protac_dataset():
     
     return dataset
 
+def generate_function_prediction_data(go_term="biological_process", train_dir=None, test_dir=None):
+    
+    # test_simil = pd.read_csv("GO_data_processed_0502/nrPDB-GO_test.csv", sep=',')
+    # df_test50 = test_simil[test_simil["<50%"] == 1]
+    # test50 = df_test50['PDB-chain'].tolist()
+
+    # with open("GO_data_processed_0502/data_splits.json", "r") as fs:
+    #     data_split = json.load(fs)
+        
+    # train_protein = data_split["train"] # IDs
+    # test_protein = data_split["test"]
+
+    # with open("GO_data_processed_0502/processed_data.json", "r") as f:
+    #     protein = json.load(f)
+
+    # train_list = []
+    # test_list = []
+    # for i in protein:
+    #     terms = np.array(i[go_term])
+    #     if i['name'] in train_protein and not np.all(terms == 0) and "X" not in i['seq'] and len(i['seq'])==len(i['coords']):
+    #         train_list.append(i)
+    # for j in protein:
+    #     terms = np.array(j[go_term])
+    #     if j['name'] in test_protein and not np.all(terms == 0) and j['name'] in test50 and "X" not in j['seq'] and len(j['seq'])==len(j['coords']):
+    #         test_list.append(j)
+            
+    # seq = []
+    # coords = []
+    # go = []
+    # for data in train_list:
+    #     seq.append(data['seq'])
+    #     coords.append(data['coords'])
+    #     go.append(data[go_term])
+    
+    # train_set = {
+    #     'seq' : seq,
+    #     'coords' : coords,
+    #     'go' : go
+    # }
+    # train_set = Dataset.from_dict(train_set)
+    # train_set = train_set.save_to_disk(go_term + "_train_0")
+    
+    # seq = []
+    # coords = []
+    # go = []
+    # for data in test_list:
+    #     seq.append(data['seq'])
+    #     coords.append(data['coords'])
+    #     go.append(data[go_term])
+    
+    # test_set = {
+    #     'seq' : seq,
+    #     'coords' : coords,
+    #     'go' : go
+    # }
+
+    # test_set = Dataset.from_dict(test_set)
+    # test_set = test_set.save_to_disk(go_term + '_test_0')
+    
+    print("Tokenizing the data...")
+    train_set = load_from_disk('./data/go_data/' + go_term + "_train_0")
+    test_set = load_from_disk('./data/go_data/' + go_term + "_test_0")
+    # Padding to the max length: 85.
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=train_set, padding_to_longest=False)
+    dataset = EgnnDataset(tokenizer=tokenizer, generate=True, include_go=True, save_dir='./data/go_data/' + go_term + "_train_1")
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=test_set, padding_to_longest=False)
+    dataset = EgnnDataset(tokenizer=tokenizer, generate=True, include_go=True, save_dir='./data/go_data/' + go_term + "_test_1")
+    
+    # dataset = load_from_disk('protein_drug_1')
+    # print(dataset[0])
+    
+    train_set = load_from_disk('./data/go_data/' + go_term + "_train_1")
+    test_set = load_from_disk('./data/go_data/' + go_term + "_test_1")
+
+    input_ids, coords, masks, go = [], [], [], []
+    for protein in tqdm(train_set):
+        input_ids.append(torch.tensor(protein['input_ids']))
+        coords.append(torch.tensor(protein['coords']))
+        masks.append(torch.tensor(protein['masks']).bool())
+        go.append(torch.tensor(protein['go']))
+
+    input_ids = torch.stack(input_ids)
+    coords = torch.stack(coords)
+    masks = torch.stack(masks)
+    go = torch.stack(go)
+    train_set = {
+        "input_ids" : input_ids,
+        "coords" : coords,
+        "masks" : masks,
+        "go" : go
+    }
+
+    train_set = Dataset.from_dict(train_set)
+    train_set.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'go'])
+    train_set = train_set.save_to_disk(go_term + "_train_2")
+    
+    input_ids, coords, masks, go = [], [], [], []
+    for protein in tqdm(test_set):
+        input_ids.append(torch.tensor(protein['input_ids']))
+        coords.append(torch.tensor(protein['coords']))
+        masks.append(torch.tensor(protein['masks']).bool())
+        go.append(torch.tensor(protein['go']))
+
+    input_ids = torch.stack(input_ids)
+    coords = torch.stack(coords)
+    masks = torch.stack(masks)
+    go = torch.stack(go)
+    test_set = {
+        "input_ids" : input_ids,
+        "coords" : coords,
+        "masks" : masks,
+        "go" : go
+    }
+
+    test_set = Dataset.from_dict(test_set)
+    test_set.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'go'])
+    test_set = test_set.save_to_disk(go_term + "_test_2")
+            
+    return train_set, test_set
+
 def get_drug_graph():
     
     dataset = load_from_disk("protein_drug_1") # {input_ids, coords, masks, drugs}
@@ -313,8 +431,16 @@ if __name__ == '__main__':
     
     
     # generate_protac_dataset()
-    dataset = load_from_disk('./data/protac_1')
-    print(dataset[0])
-    print(dataset[0]['warhead'])
-    print(dataset[100]['warhead'])
-    print(dataset[1000]['warhead'])
+    # dataset = load_from_disk('./data/protac_1')
+    # print(dataset[0])
+    # print(dataset[0]['warhead'])
+    # print(dataset[100]['warhead'])
+    # print(dataset[1000]['warhead'])
+    
+    # generate_function_prediction_data(go_term='cellular_component') # 320
+    # generate_function_prediction_data(go_term='biological_process') # 1943
+    # generate_function_prediction_data(go_term='molecular_function') # 489
+    # data = load_from_disk('./data/go_data/cellular_component_train_2')
+    data = load_from_disk('./data/go_data/molecular_function_train_2')
+    
+    print(len(data[0]['go']))
