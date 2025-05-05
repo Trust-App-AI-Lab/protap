@@ -90,7 +90,7 @@ class Se3PLIModel(nn.Module):
         self.drug_graphs = get_drug_graph()
         
         if freeze_se3:
-            for param in self.egnn.parameters():
+            for param in self.se3.parameters():
                 param.requires_grad = False
 
     def forward(self, 
