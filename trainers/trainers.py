@@ -261,6 +261,24 @@ class DataCollatorForEgnnGO(object):
             go=go
         )
 
+@dataclass
+class DataCollatorForSe3GO(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, go = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "go")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            go=go
+        )
+
 class EgnnAttributeMaskingTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -1546,17 +1564,17 @@ class EgnnGOTrainer(Trainer):
         # print(batch_go.type())
 
         logits = model(**inputs)
-        probs = torch.sigmoid(logits)
-        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_go.float(), reduction="none")  # shape: (B, L)
+        # probs = torch.sigmoid(logits)
+        bce_loss = F.binary_cross_entropy_with_logits(logits, batch_go.float())  # shape: (B, L)
 
-        p_t = probs * batch_go + (1 - probs) * (1 - batch_go)  # Prob of true class
-        alpha_t = self.args.alpha * batch_go + (1 - self.args.alpha) * (1 - batch_go)
+        # p_t = probs * batch_go + (1 - probs) * (1 - batch_go)  # Prob of true class
+        # alpha_t = self.args.alpha * batch_go + (1 - self.args.alpha) * (1 - batch_go)
 
-        loss = alpha_t * ((1 - p_t) ** self.args.gamma) * ce_loss  # focal loss
+        # loss = alpha_t * ((1 - p_t) ** self.args.gamma) * ce_loss  # focal loss
 
-        return loss.mean()
+        return bce_loss
     
-class EgnnGOTrainer(Trainer):
+class Se3GOTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
 
@@ -1566,8 +1584,6 @@ class EgnnGOTrainer(Trainer):
         num_mlp_layer (int, optional): Number of MLP layers
         graph_construction_model (optional): Graph construction model for enhancing graph features
     """
-
-
     def compute_loss(
         self,
         model,
@@ -1583,22 +1599,23 @@ class EgnnGOTrainer(Trainer):
         batch_coords = torch.stack(batch_coords)
         batch_masks = torch.stack(batch_masks)
         batch_go = torch.stack(batch_go)
-
+        
+        feats = batch_input_ids
+        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(feats.shape[-1], device=feats.device)
+        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        
         inputs = {
-            "feats" : batch_input_ids,
+            "feats" : feats,
             "coors" : batch_coords,
             "mask" : batch_masks,
+            "adj_mat" : adj_mat,
         }
-        
-        # print(batch_go.type())
 
         logits = model(**inputs)
         probs = torch.sigmoid(logits)
-        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_go.float(), reduction="none")  # shape: (B, L)
+        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_go.float())  # shape: (B, L)
 
-        p_t = probs * batch_go + (1 - probs) * (1 - batch_go)  # Prob of true class
-        alpha_t = self.args.alpha * batch_go + (1 - self.args.alpha) * (1 - batch_go)
-
-        loss = alpha_t * ((1 - p_t) ** self.args.gamma) * ce_loss  # focal loss
-
-        return loss.mean()
+        return ce_loss
