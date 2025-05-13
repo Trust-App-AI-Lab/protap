@@ -278,9 +278,44 @@ class DataCollatorForSe3GO(object):
             masks=masks,
             go=go
         )
+        
+@dataclass
+class DataCollatorForProteinBERTGO(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, masks, go = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("seq", "mask", "go")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            masks=masks,
+            go=go
+        )
 
 @dataclass
 class DataCollatorForEgnnCleavage(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, coords, masks, site = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("feats", "coors", "mask", "site")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            coords=coords,
+            masks=masks,
+            site=site
+        )
+
+@dataclass
+class DataCollatorForSe3Cleavage(object):
     """Collate examples for training EGNN with Maksed Residue Prediction task."""
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
@@ -1638,6 +1673,48 @@ class Se3GOTrainer(Trainer):
 
         return ce_loss
 
+class ProteinBertGOTrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        
+        batch_input_ids, batch_masks, batch_go = inputs['input_ids'], inputs['masks'], inputs['go']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_masks = torch.stack(batch_masks)
+        batch_go = torch.stack(batch_go)
+        
+        batch_size = len(batch_input_ids)
+        
+        annotation = torch.zeros(batch_size, 1, device=batch_input_ids.device)
+        
+        inputs = {
+            "seq" : batch_input_ids,
+            "mask" : batch_masks,
+            "annotation" : annotation,
+        }
+        
+        logits = model(**inputs)
+
+        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_go.float())  # shape: (B, L)
+
+        return ce_loss
+
 class EgnnCleavageTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -1678,3 +1755,49 @@ class EgnnCleavageTrainer(Trainer):
         bce_loss = F.binary_cross_entropy_with_logits(logits, batch_site)  # shape: (B, L)
 
         return bce_loss
+
+class Se3CleavageTrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        batch_input_ids, batch_coords, batch_masks, batch_site = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['site']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_coords = torch.stack(batch_coords)
+        batch_masks = torch.stack(batch_masks)
+        batch_site = torch.stack(batch_site)
+        
+        feats = batch_input_ids
+        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
+        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
+        
+        i = torch.arange(feats.shape[-1], device=feats.device)
+        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        
+        inputs = {
+            "feats" : feats,
+            "coors" : batch_coords,
+            "mask" : batch_masks,
+            "adj_mat" : adj_mat,
+        }
+
+        logits = model(**inputs)
+
+        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_site)  # shape: (B, L)
+
+        return ce_loss
