@@ -37,24 +37,16 @@ class EgnnCleavageModel(nn.Module):
         
         return logits
     
-class Se3GOModel(nn.Module):
+class Se3CleavageModel(nn.Module):
     def __init__(self, 
                  dim,
                  se3_model, 
-                 go_term=None,
                  freeze_se3: bool=False,
                  ):
         super().__init__()
         self.se3 = se3_model
-        
-        if go_term == 'biological_process':
-            self.out_dim = 1943
-        elif go_term == 'molecular_function':
-            self.out_dim = 489
-        elif go_term == 'cellular_component':
-            self.out_dim = 320
             
-        self.linear = nn.Linear(dim, self.out_dim)
+        self.linear = nn.Linear(dim, 1357)
         
         if freeze_se3:
             for param in self.se3.parameters():
@@ -65,7 +57,7 @@ class Se3GOModel(nn.Module):
                 coors, 
                 mask,
                 adj_mat, 
-                go=None,
+                site=None,
             ):
 
         feats = self.se3(

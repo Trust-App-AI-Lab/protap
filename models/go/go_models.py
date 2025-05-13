@@ -87,3 +87,44 @@ class Se3GOModel(nn.Module):
         logits = self.linear(feats)
         
         return logits
+
+class ProteinBERTGOModel(nn.Module):
+    def __init__(self, 
+                 dim,
+                 bert_model, 
+                 go_term=None,
+                 freeze_bert: bool=False,
+                 ):
+        super().__init__()
+        self.bert = bert_model
+        
+        if go_term == 'biological_process':
+            self.out_dim = 1943
+        elif go_term == 'molecular_function':
+            self.out_dim = 489
+        elif go_term == 'cellular_component':
+            self.out_dim = 320
+            
+        self.linear = nn.Linear(dim, self.out_dim)
+        
+        if freeze_bert:
+            for param in self.bert.parameters():
+                param.requires_grad = False
+
+    def forward(self, 
+                seq,  
+                mask, 
+                go=None,
+                annotation=None
+            ):
+
+        feats = self.bert(
+            seq=seq,  
+            mask=mask,
+            annotation=annotation
+        )[0]
+        feats = masked_mean_pooling(feats, mask) # (batch_size, dim)
+
+        logits = self.linear(feats)
+        
+        return logits
