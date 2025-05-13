@@ -50,6 +50,7 @@ class EgnnDataset(ProteinDataset):
         include_family: bool=False,
         include_drug: bool=False,
         include_go: bool=False,
+        include_site: bool=False,
         save_dir=None,
     ):  
         # Generate the dataset from scrach.
@@ -87,6 +88,9 @@ class EgnnDataset(ProteinDataset):
             
             if include_go:
                 self.go = self.data['go']
+                
+            if include_site:
+                self.site = self.data['labels']
             
             self.input_ids, self.masks = self.tokenizer.tokenize()
             
@@ -112,14 +116,22 @@ class EgnnDataset(ProteinDataset):
                     "masks" : self.masks,
                     "go" : self.go
                 }
+            
+            if include_site:
+                self.dataset = {
+                    "input_ids" : self.input_ids,
+                    "coords" : self.coords,
+                    "masks" : self.masks,
+                    "site" : self.site
+                }
                 
             self.raw_dataset = Dataset.from_dict(self.dataset)
             
             # TODO
             if save_dir:
                 self.raw_dataset = self.raw_dataset.save_to_disk(save_dir)
-            else:
-                self.raw_dataset = self.raw_dataset.save_to_disk('biological_process_1')
+            # else:
+            #     self.raw_dataset = self.raw_dataset.save_to_disk('biological_process_1')
         else:
             # self.tokenizer = tokenizer
             # self.sequences = self.tokenizer.sequences

@@ -1,5 +1,6 @@
 import os
 import json
+import pickle
 from datasets import Dataset, load_from_disk
 
 from data.dataset import EgnnDataset, ProtacDataset
@@ -271,62 +272,62 @@ def generate_protac_dataset():
 
 def generate_function_prediction_data(go_term="biological_process", train_dir=None, test_dir=None):
     
-    # test_simil = pd.read_csv("GO_data_processed_0502/nrPDB-GO_test.csv", sep=',')
-    # df_test50 = test_simil[test_simil["<50%"] == 1]
-    # test50 = df_test50['PDB-chain'].tolist()
+    test_simil = pd.read_csv("GO_data_processed_0502/nrPDB-GO_test.csv", sep=',')
+    df_test50 = test_simil[test_simil["<50%"] == 1]
+    test50 = df_test50['PDB-chain'].tolist()
 
-    # with open("GO_data_processed_0502/data_splits.json", "r") as fs:
-    #     data_split = json.load(fs)
+    with open("GO_data_processed_0502/data_splits.json", "r") as fs:
+        data_split = json.load(fs)
         
-    # train_protein = data_split["train"] # IDs
-    # test_protein = data_split["test"]
+    train_protein = data_split["train"] # IDs
+    test_protein = data_split["test"]
 
-    # with open("GO_data_processed_0502/processed_data.json", "r") as f:
-    #     protein = json.load(f)
+    with open("GO_data_processed_0502/processed_data.json", "r") as f:
+        protein = json.load(f)
 
-    # train_list = []
-    # test_list = []
-    # for i in protein:
-    #     terms = np.array(i[go_term])
-    #     if i['name'] in train_protein and not np.all(terms == 0) and "X" not in i['seq'] and len(i['seq'])==len(i['coords']):
-    #         train_list.append(i)
-    # for j in protein:
-    #     terms = np.array(j[go_term])
-    #     if j['name'] in test_protein and not np.all(terms == 0) and j['name'] in test50 and "X" not in j['seq'] and len(j['seq'])==len(j['coords']):
-    #         test_list.append(j)
+    train_list = []
+    test_list = []
+    for i in protein:
+        terms = np.array(i[go_term])
+        if i['name'] in train_protein and not np.all(terms == 0) and "X" not in i['seq'] and len(i['seq'])==len(i['coords']):
+            train_list.append(i)
+    for j in protein:
+        terms = np.array(j[go_term])
+        if j['name'] in test_protein and not np.all(terms == 0) and j['name'] in test50 and "X" not in j['seq'] and len(j['seq'])==len(j['coords']):
+            test_list.append(j)
             
-    # seq = []
-    # coords = []
-    # go = []
-    # for data in train_list:
-    #     seq.append(data['seq'])
-    #     coords.append(data['coords'])
-    #     go.append(data[go_term])
+    seq = []
+    coords = []
+    go = []
+    for data in train_list:
+        seq.append(data['seq'])
+        coords.append(data['coords'])
+        go.append(data[go_term])
     
-    # train_set = {
-    #     'seq' : seq,
-    #     'coords' : coords,
-    #     'go' : go
-    # }
-    # train_set = Dataset.from_dict(train_set)
-    # train_set = train_set.save_to_disk(go_term + "_train_0")
+    train_set = {
+        'seq' : seq,
+        'coords' : coords,
+        'go' : go
+    }
+    train_set = Dataset.from_dict(train_set)
+    train_set = train_set.save_to_disk(go_term + "_train_0")
     
-    # seq = []
-    # coords = []
-    # go = []
-    # for data in test_list:
-    #     seq.append(data['seq'])
-    #     coords.append(data['coords'])
-    #     go.append(data[go_term])
+    seq = []
+    coords = []
+    go = []
+    for data in test_list:
+        seq.append(data['seq'])
+        coords.append(data['coords'])
+        go.append(data[go_term])
     
-    # test_set = {
-    #     'seq' : seq,
-    #     'coords' : coords,
-    #     'go' : go
-    # }
+    test_set = {
+        'seq' : seq,
+        'coords' : coords,
+        'go' : go
+    }
 
-    # test_set = Dataset.from_dict(test_set)
-    # test_set = test_set.save_to_disk(go_term + '_test_0')
+    test_set = Dataset.from_dict(test_set)
+    test_set = test_set.save_to_disk(go_term + '_test_0')
     
     print("Tokenizing the data...")
     train_set = load_from_disk('./data/go_data/' + go_term + "_train_0")
@@ -389,6 +390,173 @@ def generate_function_prediction_data(go_term="biological_process", train_dir=No
             
     return train_set, test_set
 
+def get_cleavage_data(dataset_name):
+    
+    train_raw = "./data/cleavage_data/train_C14005.pkl"
+    test_raw = "./data/cleavage_data/test_C14005.pkl"
+
+    with open('./data/cleavage_data/Substrate.pickle', 'rb') as fsub:
+        sub_protein = pickle.load(fsub)
+
+    data_list = []
+    for protein_id, protein_data in sub_protein.items():
+        protein_data['name'] = protein_id
+        data_list.append(protein_data)
+
+    with open(train_raw, "rb") as ftr:
+        train_raw_data = pickle.load(ftr)
+    with open(test_raw, "rb") as fte:
+        test_raw_data = pickle.load(fte)
+
+    train_label_dict = {k.split("_")[0]: v for k, v in train_raw_data.items()}
+    test_label_dict  = {k.split("_")[0]: v for k, v in test_raw_data.items()}
+
+    train_list, test_list = [], []
+    for p in data_list:
+        pid = p['name']
+        if pid in train_label_dict and len(p["seq"]) >=np.max(train_label_dict[pid]):
+            p['cleave_site'] = train_label_dict[pid]
+            train_list.append(p)
+        elif pid in test_label_dict and len(p["seq"]) >=np.max(test_label_dict[pid]):
+            p['cleave_site'] = test_label_dict[pid]
+            test_list.append(p)
+    
+    seq = []
+    coords = []
+    site = []
+    for data in train_list:
+        seq.append(data['seq'])
+        coords.append(data['coords'])
+        site.append(data['cleave_site'])
+    
+    train_set = {
+        'seq' : seq,
+        'coords' : coords,
+        'site' : site
+    }
+    train_set = Dataset.from_dict(train_set)
+    train_set = train_set.save_to_disk(dataset_name + "_train_0")
+    
+    seq = []
+    coords = []
+    site = []
+    for data in test_list:
+        seq.append(data['seq'])
+        coords.append(data['coords'])
+        site.append(data['cleave_site'])
+    
+    test_set = {
+        'seq' : seq,
+        'coords' : coords,
+        'site' : site
+    }
+
+    test_set = Dataset.from_dict(test_set)
+    test_set = test_set.save_to_disk(dataset_name + '_test_0')
+    
+    train_set = load_from_disk(dataset_name + '_train_0') # Max number of sites: 18 & 56
+    test_set = load_from_disk(dataset_name + '_test_0') # Max site position: 1356.
+    
+    l = 0
+    k = 0
+    for x in train_set['site']:
+        l = max(l, len(x))
+        for y in x:
+            k = max(k, y)
+    print(l)
+    print(k)
+    for x in test_set['site']:
+        l = max(l, len(x))
+        for y in x:
+            k = max(k, y)
+    print(l)
+    print(k)
+    print(train_set['site'])
+    
+    # Construct the multi labels.
+    labels = train_set['site']
+    multi_hot = torch.zeros(len(labels), 1357, dtype=torch.float)
+
+    for i, label in enumerate(labels):
+        multi_hot[i, label] = 1.0
+    
+    train_set = train_set.add_column('labels', multi_hot.tolist())
+    
+    labels = test_set['site']
+    multi_hot = torch.zeros(len(labels), 1357, dtype=torch.float)
+
+    for i, label in enumerate(labels):
+        multi_hot[i, label] = 1.0
+    
+    test_set = test_set.add_column('labels', multi_hot.tolist())
+    
+    train_set = train_set.save_to_disk(dataset_name + '_train_1')
+    test_set = test_set.save_to_disk(dataset_name + '_test_1')
+    
+    train_set = load_from_disk(dataset_name + '_train_1')
+    test_set = load_from_disk(dataset_name + '_test_1')
+    
+    # print(train_set[100]['labels'])
+    
+    print("Tokenizing the data...")
+
+    # Padding to the max length: 768.
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=train_set, padding_to_longest=False)
+    dataset = EgnnDataset(tokenizer=tokenizer, generate=True, include_site=True, save_dir='./data/cleavage_data/' + dataset_name + "_train_2")
+    tokenizer = ProteinTokenizer(max_seq_length=768, dataset=test_set, padding_to_longest=False)
+    dataset = EgnnDataset(tokenizer=tokenizer, generate=True, include_site=True, save_dir='./data/cleavage_data/' + dataset_name + "_test_2")
+    
+    train_set = load_from_disk('./data/cleavage_data/' + dataset_name + "_train_2")
+    test_set = load_from_disk('./data/cleavage_data/' + dataset_name + "_test_2")
+    
+    print(train_set[0])
+
+    input_ids, coords, masks, site = [], [], [], []
+    for protein in tqdm(train_set):
+        input_ids.append(torch.tensor(protein['input_ids']))
+        coords.append(torch.tensor(protein['coords']))
+        masks.append(torch.tensor(protein['masks']).bool())
+        site.append(torch.tensor(protein['site']))
+
+    input_ids = torch.stack(input_ids)
+    coords = torch.stack(coords)
+    masks = torch.stack(masks)
+    site = torch.stack(site)
+    train_set = {
+        "input_ids" : input_ids,
+        "coords" : coords,
+        "masks" : masks,
+        "site" : site
+    }
+
+    train_set = Dataset.from_dict(train_set)
+    train_set.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'site'])
+    train_set = train_set.save_to_disk(dataset_name + "_train_3")
+    
+    input_ids, coords, masks, site = [], [], [], []
+    for protein in tqdm(test_set):
+        input_ids.append(torch.tensor(protein['input_ids']))
+        coords.append(torch.tensor(protein['coords']))
+        masks.append(torch.tensor(protein['masks']).bool())
+        site.append(torch.tensor(protein['site']))
+
+    input_ids = torch.stack(input_ids)
+    coords = torch.stack(coords)
+    masks = torch.stack(masks)
+    site = torch.stack(site)
+    test_set = {
+        "input_ids" : input_ids,
+        "coords" : coords,
+        "masks" : masks,
+        "site" : site
+    }
+
+    test_set = Dataset.from_dict(test_set)
+    test_set.set_format(type='torch', columns=['input_ids', 'coords', 'masks', 'site'])
+    test_set = test_set.save_to_disk(dataset_name + "_test_3")
+            
+    return train_set, test_set
+
 def get_drug_graph():
     
     dataset = load_from_disk("protein_drug_1") # {input_ids, coords, masks, drugs}
@@ -441,6 +609,27 @@ if __name__ == '__main__':
     # generate_function_prediction_data(go_term='biological_process') # 1943
     # generate_function_prediction_data(go_term='molecular_function') # 489
     # data = load_from_disk('./data/go_data/cellular_component_train_2')
-    data = load_from_disk('./data/go_data/molecular_function_train_2')
+    # dataset = load_from_disk('./data/go_data/molecular_function_test_2')
+    # dataset = load_from_disk('./data/go_data/biological_process_test_2')
+    # count_all_zero = 0
     
-    print(len(data[0]['go']))
+    # print(len(dataset))
+
+    # for data in dataset:
+    #     go = data['go']  # Tensor or list
+    #     # go_tensor = torch.tensor(go) if not isinstance(go, torch.Tensor) else go
+    #     if torch.sum(go) < 1:
+    #         count_all_zero += 1
+    #         print(data)
+
+    # print(f"GO全为0的样本数量: {count_all_zero}")
+    
+    # dataset = load_from_disk('./data/swiss-protein-540k-tensor')
+    # print(len(dataset))
+    
+    # get_cleavage_data('m10003')
+    # get_cleavage_data('c14005')
+    dataset = load_from_disk('./data/cleavage_data/c14005_test_3')
+    for data in dataset:
+        if torch.sum(data['site']) < 1:
+            print(data)
