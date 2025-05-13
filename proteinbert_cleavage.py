@@ -12,12 +12,13 @@ from typing import Optional
 from tqdm import tqdm
 import torch.distributed as dist
 
-from models.egnn.egnn import *
+from models.proteinbert.proteinbert import *
 from models.cleavage_site.cleavage_site_models import *
-from trainers.trainers import EgnnCleavageTrainer, DataCollatorForEgnnCleavage
+from trainers.trainers import ProteinBertCleavageTrainer, DataCollatorForProteinBERTCleavage
 from utils.load_models import load_pretrain_model
 from utils.metrics import *
-from sklearn.metrics import average_precision_score, roc_auc_score
+from sklearn.metrics import average_precision_score, precision_recall_fscore_support
+
 
 @dataclass
 class ModelArguments:
@@ -83,16 +84,14 @@ if __name__ == '__main__':
     # TODO
     train_set = load_from_disk(data_dir + "_train_3")
     # Rename the column name for training.
-    train_set = train_set.rename_column('input_ids', 'feats')
-    train_set = train_set.rename_column('coords', 'coors')
+    train_set = train_set.rename_column('input_ids', 'seq')
     train_set = train_set.rename_column('masks', 'mask')
 
     dataset = train_set
     
     test_set = load_from_disk(data_dir + "_test_3")
     # Rename the column name for training.
-    test_set = test_set.rename_column('input_ids', 'feats')
-    test_set = test_set.rename_column('coords', 'coors')
+    test_set = test_set.rename_column('input_ids', 'seq')
     test_set = test_set.rename_column('masks', 'mask')
     # DEBUG
     # dataset = dataset.select(range(0, 96))
@@ -100,41 +99,48 @@ if __name__ == '__main__':
     print(len(dataset))
     
     if training_args.load_pretrain:
-        net = EGNN_Network(
+        net = ProteinBERT(
             num_tokens=22,
-            num_positions=training_args.max_amino_acids_sequence_length,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
+            num_annotation=1, # We do not include the GO labels into the training.
             dim=training_args.hidden_dim,
-            depth=3,
-            num_nearest_neighbors=8,
-            coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
-        )
-        
-        egnn = load_pretrain_model(model_path=model_args.model_name_or_path, model=net)
+            dim_global=256,
+            depth=12,
+            narrow_conv_kernel=9,
+            wide_conv_kernel=9,
+            wide_conv_dilation=5,
+            attn_heads=8,
+            attn_dim_head=64,
+        )  
+        prot_bert = load_pretrain_model(model_path=model_args.model_name_or_path, model=net)
     else:
-        egnn = EGNN_Network(
+        prot_bert = ProteinBERT(
             num_tokens=22,
-            num_positions=training_args.max_amino_acids_sequence_length,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
+            num_annotation=1, # We do not include the GO labels into the training.
             dim=training_args.hidden_dim,
-            depth=3,
-            num_nearest_neighbors=8,
-            coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
+            dim_global=256,
+            depth=12,
+            narrow_conv_kernel=9,
+            wide_conv_kernel=9,
+            wide_conv_dilation=5,
+            attn_heads=8,
+            attn_dim_head=64,
         )
     
-    model = EgnnCleavageModel(
+    model = ProteinBERTCleavageModel(
         dim=training_args.hidden_dim,
-        egnn_model=egnn,
-        freeze_egnn=training_args.load_pretrain
+        bert_model=prot_bert,
+        freeze_bert=training_args.load_pretrain
     )
     
     for name, param in model.named_parameters():
         if param.requires_grad:
             print(f"{name}: {param.shape}")
             
-    trainer = EgnnCleavageTrainer(
+    trainer = ProteinBertCleavageTrainer(
         model=model,
         train_dataset=dataset,
         args=training_args,
-        data_collator=DataCollatorForEgnnCleavage(),
+        data_collator=DataCollatorForProteinBERTCleavage(),
     )
     
     trainer.train()
@@ -149,7 +155,7 @@ if __name__ == '__main__':
         test_set,
         batch_size=96,
         shuffle=True,
-        collate_fn=DataCollatorForEgnnCleavage(),
+        collate_fn=DataCollatorForProteinBERTCleavage(),
         # num_workers=4
     )
     
@@ -159,18 +165,20 @@ if __name__ == '__main__':
     with torch.no_grad():
         for step, inputs in tqdm(enumerate(test_loader)):
             
-            batch_input_ids, batch_coords, batch_masks, batch_site = inputs['input_ids'], inputs['coords'], inputs['masks'], inputs['site']
-        
-            batch_input_ids = torch.stack(batch_input_ids).to("cuda")
-            batch_coords = torch.stack(batch_coords).to("cuda")
+            batch_input_ids, batch_masks, batch_site = inputs['input_ids'], inputs['masks'], inputs['site']
+            
+            batch_input_ids = torch.stack(batch_input_ids).to('cuda')
             batch_masks = torch.stack(batch_masks).to("cuda")
             batch_site = torch.stack(batch_site)
-
+            
+            batch_size = len(batch_input_ids)
+            
+            annotation = torch.zeros(batch_size, 1, device=batch_input_ids.device)
+            
             inputs = {
-                "feats" : batch_input_ids,
-                "coors" : batch_coords,
+                "seq" : batch_input_ids,
                 "mask" : batch_masks,
-                "site" : batch_site
+                "annotation" : annotation,
             }
             
             logits = model(**inputs)
@@ -181,25 +189,7 @@ if __name__ == '__main__':
             all_labels.append(labels)
     
     all_probs = torch.cat(all_probs).numpy()
-    all_labels = torch.cat(all_labels).numpy().astype(int)
-    
-    valid_scores = []
-
-    for i in range(all_labels.shape[1]):
-        y_true = all_labels[:, i]
-        y_score = all_probs[:, i]
-
-        if np.sum(y_true) == 0:
-            continue
-
-        try:
-            auc = roc_auc_score(y_true, y_score)
-            valid_scores.append(auc)
-        except ValueError as e:
-            print(f"Skipping class {i} due to error: {e}")
-            
-    mean_auc = np.mean(valid_scores)
-    print(f"Macro ROC AUC over valid classes: {mean_auc}")
+    all_labels = torch.cat(all_labels).numpy()
     
     valid_aupr = []
     for i in range(all_labels.shape[1]):
@@ -213,6 +203,19 @@ if __name__ == '__main__':
         valid_aupr.append(score)
 
     print(f"Macro AUPR over valid classes: {np.mean(valid_aupr)}")
+    
+    # aupr = average_precision_score(all_labels, all_probs, average='macro')
+    # print(f"AUPR: {aupr:.4f}")
+
+    thresholds = np.linspace(0.0, 1.0, num=101)
+    fmax = 0.0
+
+    for t in thresholds:
+        binarized = (all_probs >= t).astype(int)
+        precision, recall, f1, _ = precision_recall_fscore_support(all_labels, binarized, average='macro', zero_division=0)
+        fmax = max(fmax, f1)
+
+    print(f"Fmax: {fmax:.4f}")
     
     dist.destroy_process_group()
     

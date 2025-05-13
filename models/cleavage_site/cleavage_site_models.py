@@ -71,3 +71,36 @@ class Se3CleavageModel(nn.Module):
         logits = self.linear(feats)
         
         return logits
+
+class ProteinBERTCleavageModel(nn.Module):
+    def __init__(self, 
+                 dim,
+                 bert_model, 
+                 freeze_bert: bool=False,
+                 ):
+        super().__init__()
+        self.bert = bert_model
+            
+        self.linear = nn.Linear(dim, 1357)
+        
+        if freeze_bert:
+            for param in self.bert.parameters():
+                param.requires_grad = False
+
+    def forward(self, 
+                seq,  
+                mask, 
+                annotation=None,
+                site=None
+            ):
+
+        feats = self.bert(
+            seq=seq,  
+            mask=mask,
+            annotation=annotation
+        )[0]
+        feats = masked_mean_pooling(feats, mask) # (batch_size, dim)
+
+        logits = self.linear(feats)
+        
+        return logits

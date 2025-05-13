@@ -332,6 +332,23 @@ class DataCollatorForSe3Cleavage(object):
             site=site
         )
 
+@dataclass
+class DataCollatorForProteinBERTCleavage(object):
+    """Collate examples for training EGNN with Maksed Residue Prediction task."""
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        
+        input_ids, masks, site = tuple(
+            # [instance[key] for instance in instances] for key in ("input_ids", "coords", "masks")
+            [instance[key] for instance in instances] for key in ("seq", "mask", "site")
+        )
+        
+        return dict(
+            input_ids=input_ids,
+            masks=masks,
+            site=site
+        )
+
 class EgnnAttributeMaskingTrainer(Trainer):
     """
     Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
@@ -1796,6 +1813,48 @@ class Se3CleavageTrainer(Trainer):
             "adj_mat" : adj_mat,
         }
 
+        logits = model(**inputs)
+
+        ce_loss = F.binary_cross_entropy_with_logits(logits, batch_site)  # shape: (B, L)
+
+        return ce_loss
+
+class ProteinBertCleavageTrainer(Trainer):
+    """
+    Attribute masking trainer using Hugging Face Trainer framework for pretraining graph neural networks.
+
+    Parameters:
+        model (nn.Module): Node representation model
+        mask_rate (float, optional): Rate of masked nodes
+        num_mlp_layer (int, optional): Number of MLP layers
+        graph_construction_model (optional): Graph construction model for enhancing graph features
+    """
+    def compute_loss(
+        self,
+        model,
+        inputs,
+        num_items_in_batch=None, # Must add this arg.
+    ):
+        """
+        Compute loss for a batch using cross entropy loss.
+        """
+        
+        batch_input_ids, batch_masks, batch_site = inputs['input_ids'], inputs['masks'], inputs['site']
+        
+        batch_input_ids = torch.stack(batch_input_ids)
+        batch_masks = torch.stack(batch_masks)
+        batch_site = torch.stack(batch_site)
+        
+        batch_size = len(batch_input_ids)
+        
+        annotation = torch.zeros(batch_size, 1, device=batch_input_ids.device)
+        
+        inputs = {
+            "seq" : batch_input_ids,
+            "mask" : batch_masks,
+            "annotation" : annotation,
+        }
+        
         logits = model(**inputs)
 
         ce_loss = F.binary_cross_entropy_with_logits(logits, batch_site)  # shape: (B, L)
