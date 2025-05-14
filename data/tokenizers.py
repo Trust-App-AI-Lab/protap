@@ -187,3 +187,31 @@ class ProtacTokenizer:
         Pads a sequence to the maximum length if it's shorter.
         """
         return sequence + [self.amino2dict['<PAD>']] * (self.max_length - len(sequence)) if len(sequence) < self.max_length else sequence
+    
+class EnzymeTokenizer:
+    def __init__(self, max_seq_length: int, padding_to_longest=False):
+        self.amino_dict = ["D", "F", "H", "N", "A", "I", "V", "M", "E", "G", "K", "Q", "C", "W", "Y", "P", "S", "L", "T", "R"]
+        self.amino_dict.append('<MASK>')
+        self.amino_dict.append('<PAD>')
+        self.amino2dict = {aa: idx for idx, aa in enumerate(self.amino_dict)}
+        self.padding_to_longest = padding_to_longest
+        self.default_max_seq_length = max_seq_length
+
+    def encode(self, sequence, max_len):
+        tokens = [self.amino2dict.get(aa, self.amino2dict['<PAD>']) for aa in sequence]
+        if len(tokens) > max_len:
+            tokens = tokens[:max_len]
+        elif len(tokens) < max_len:
+            tokens += [self.amino2dict['<PAD>']] * (max_len - len(tokens))
+            
+        return tokens
+
+    def tokenize(self, sequences):
+        if self.padding_to_longest:
+            max_len = max(len(seq) for seq in sequences)
+        else:
+            max_len = self.default_max_seq_length
+        input_ids = [self.encode(seq, max_len) for seq in sequences]
+        masks = [[1 if token != self.amino2dict['<PAD>'] else 0 for token in seq] for seq in input_ids]
+        
+        return input_ids, masks
