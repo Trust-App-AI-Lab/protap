@@ -6,9 +6,7 @@ def load_pretrain_model(
     model: torch.nn.Module
 ):
     state_dict = torch.load(model_path)
-    # device = torch.device("cuda")
-    # net.load_state_dict(torch.load('egnn_node.pt', weights_only=True, map_location="cpu"))
-    # # net.to(device)
+
     new_state_dict = {}
     for k, v in state_dict.items():
         new_key = k.replace('module', '')
@@ -17,3 +15,12 @@ def load_pretrain_model(
     model.load_state_dict(new_state_dict, strict=False)
     
     return model
+
+def count_model_parameters(model: torch.nn.Module):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    print(f"Total parameters: {total_params:,}")
+    print(f"Trainable parameters: {trainable_params:,}")
+    
+    return total_params, trainable_params

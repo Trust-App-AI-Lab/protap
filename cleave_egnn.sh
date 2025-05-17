@@ -1,3 +1,3 @@
 torchrun --nproc_per_node=8 cleave_egnn.py \
-    --seed 42 \
+    --seed 128 \
     --load_pretrain True

@@ -192,7 +192,7 @@ def main():
     parser.add_argument('--warmup_epochs', type=int, default=5)
     parser.add_argument('--total_epochs', type=int, default=50)
     parser.add_argument('--load_pretrain', type=bool, default=False)
-    parser.add_argument('--model_name_or_path', type=str, default='./checkpoints/egnn_family.pt')
+    parser.add_argument('--model_name_or_path', type=str, default='./checkpoints/egnn_node.pt')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=24)
     args = parser.parse_args()
@@ -209,8 +209,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     train_list, test_list = train_and_test_data(
-            train_raw="./data/cleavage_data/train_M10003.pkl",
-            test_raw="./data/cleavage_data/test_M10003.pkl"
+            train_raw="./data/cleavage_data/train_C14005.pkl",
+            test_raw="./data/cleavage_data/test_C14005.pkl"
         )
     train_loader = DataLoader(
             CleavageDataset(train_list),
@@ -225,26 +225,25 @@ def main():
             collate_fn=collate_fn
         )
 
-    if args.load_pretrain:
-        net = EGNN_Network(
-                num_tokens=22,
-                num_positions=768,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
-                dim=512,
-                depth=3,
-                num_nearest_neighbors=8,
-                coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
-            )
-            
-        egnn = load_pretrain_model(model_path=args.model_name_or_path, model=net)
-    else:
-        egnn = EGNN_Network(
-                num_tokens=22,
-                num_positions=768,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
-                dim=512,
-                depth=3,
-                num_nearest_neighbors=8,
-                coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
-            )
+    net = EGNN_Network(
+            num_tokens=22,
+            num_positions=768,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
+            dim=512,
+            depth=3,
+            num_nearest_neighbors=8,
+            coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
+        )
+        
+    egnn = load_pretrain_model(model_path=args.model_name_or_path, model=net)
+    
+    # egnn = EGNN_Network(
+    #         num_tokens=22,
+    #         num_positions=768,  # unless what you are passing in is an unordered set, set this to the maximum sequence length
+    #         dim=512,
+    #         depth=3,
+    #         num_nearest_neighbors=8,
+    #         coor_weights_clamp_value=2.,   # absolute clamped value for the coordinate weights, needed if you increase the num neareest neighbors
+    #     )
         
     egnn_encoder = ProteinEgnnEncoder(egnn_model=egnn, device=device, freeze_egnn=args.load_pretrain)
     model = CleaveEgnnModel(egnn_encoder=egnn_encoder).to(rank)
@@ -329,7 +328,8 @@ def main():
 
     print(f"Test ROC-AUC: {rocauc:.4f}")
     print(f"Test AUPR:    {prauc:.4f}")
-
+    
+    dist.destroy_process_group()
 
 if __name__ == "__main__":
     main()

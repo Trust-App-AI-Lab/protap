@@ -14,10 +14,9 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc
 from tqdm import tqdm
-from einops import repeat
 
 from data.tokenizers import EnzymeTokenizer
-from models.se3transtormer.se3transformer import SE3Transformer
+from models.proteinbert.proteinbert import ProteinBERT
 from utils.load_models import *
 
 def seed_everything(seed: int = 42):
@@ -84,69 +83,48 @@ def collate_fn(batch):
                 
     return list(seqs), coords, batch_labels, torch.tensor(lengths, dtype=torch.long)
 
-class ProteinSE3Encoder(nn.Module):
+class ProteinProtbertEncoder(nn.Module):
     def __init__(self,
                 #  model_name="facebook/esm2_t33_650M_UR50D",
-                se3_model,
+                bert_model,
                 device=torch.device("cuda"),
-                freeze_se3: bool=False
+                freeze_bert: bool=False
                 ):
         super().__init__()
         self.device = device
         self.tokenizer = EnzymeTokenizer(max_seq_length=768, padding_to_longest=False)
-        self.se3 = se3_model.to(device)
+        self.bert = bert_model.to(device)
         
-        if freeze_se3:
-            for param in self.se3.parameters():
+        if freeze_bert:
+            for param in self.bert.parameters():
                 param.requires_grad = False
 
-        self.hidden_size = 36
+        self.hidden_size = 512
 
     def forward(self, batch_seqs, batch_coords):
         input_ids, masks = self.tokenizer.tokenize(batch_seqs)
         batch_input_ids = torch.tensor(input_ids).to(self.device) # [B, L]
         batch_masks = torch.tensor(masks).to(self.device)  # [B, L]
 
-        # Align coords with sequence length
-        max_len = batch_input_ids.size(1)
-        padded_coords = []
-
-        for coords in batch_coords:
-            coords = [c[1] for c in coords]  # Extract [x, y, z] from (atom, [x, y, z])
-
-            if len(coords) > max_len:
-                coords = coords[:max_len]
-            elif len(coords) < max_len:
-                coords += [[0.0, 0.0, 0.0]] * (max_len - len(coords))
-
-            padded_coords.append(coords)
-
-        batch_coords = torch.tensor(padded_coords, dtype=torch.float32).to(self.device)  # [B, L, 3]
-        
-        feats = batch_input_ids
-        feats = repeat(feats, 'b n -> b (n c)', c=1) # Expand the channel.
-        batch_masks = repeat(batch_masks, 'b n -> b (n c)', c=1) # Expand the channel.
-        
-        i = torch.arange(feats.shape[-1], device=feats.device)
-        adj_mat = (i[:, None] >= (i[None, :] - 1)) & (i[:, None] <= (i[None, :] + 1))
+        batch_size = len(batch_input_ids)
+        annotation = torch.zeros(batch_size, 1, device=batch_input_ids.device)
         
         inputs = {
-            "feats" : feats,
-            "coors" : batch_coords,
+            "seq" : batch_input_ids,
             "mask" : batch_masks.bool(),
-            "adj_mat" : adj_mat,
+            "annotation" : annotation,
         }
         
-        h = self.se3(**inputs)['0'] # (batch_size, max_length, d)
+        h = self.bert(**inputs)[0] # (batch_size, max_length, d)
         
         return h
 
-class CleaveSE3Model(nn.Module):
-    def __init__(self, se3_encoder,
+class CleaveProtbertModel(nn.Module):
+    def __init__(self, bert_encoder,
                  conv_channels=128, kernel_size=31, dropout=0.2):
         super().__init__()
-        self.se3 = se3_encoder
-        C = 36
+        self.bert = bert_encoder
+        C = 512
         self.conv1d = nn.Conv1d(C, conv_channels,
                                 kernel_size=kernel_size,
                                 padding=kernel_size // 2)
@@ -161,7 +139,7 @@ class CleaveSE3Model(nn.Module):
         )
 
     def forward(self, seqs, coords, lengths=None):
-        h = self.se3(seqs, coords)              # (B, L, C)
+        h = self.bert(seqs, coords)              # (B, L, C)
         x = h.permute(0, 2, 1)          # → (B, C, L)
         x = self.drop(self.act(self.conv1d(x)))
         x = x.permute(0, 2, 1)          # → (B, L, conv)
@@ -201,7 +179,7 @@ def main():
     parser.add_argument('--warmup_epochs', type=int, default=5)
     parser.add_argument('--total_epochs', type=int, default=50)
     parser.add_argument('--load_pretrain', type=bool, default=False)
-    parser.add_argument('--model_name_or_path', type=str, default='./checkpoints/se3transformer_family.pt')
+    parser.add_argument('--model_name_or_path', type=str, default='./checkpoints/proteinbert_family.pt')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=24)
     args = parser.parse_args()
@@ -234,48 +212,36 @@ def main():
             collate_fn=collate_fn
         )
 
-    net = SE3Transformer(
-        num_tokens = 22,
-        num_positions=768,
-        dim=36,
-        dim_head = 8,
-        heads = 2,
-        depth = 2,
-        attend_self = True,
-        input_degrees = 1,
-        output_degrees = 2,
-        reduce_dim_out = False,
-        differentiable_coors = True,
-        num_neighbors = 0,
-        attend_sparse_neighbors = True,
-        num_adj_degrees = 2,
-        adj_dim = 4,
-        num_degrees=2,
-    )
+    net = ProteinBERT(
+        num_tokens=22,
+        num_annotation=1, # We do not include the GO labels into the training.
+        dim=512,
+        dim_global=256,
+        depth=12,
+        narrow_conv_kernel=9,
+        wide_conv_kernel=9,
+        wide_conv_dilation=5,
+        attn_heads=8,
+        attn_dim_head=64,
+    )  
+    prot_bert = load_pretrain_model(model_path=args.model_name_or_path, model=net)
     
-    se3 = load_pretrain_model(model_path=args.model_name_or_path, model=net)
-
-    # se3 = SE3Transformer(
-    #     num_tokens = 22,
-    #     num_positions=768,
-    #     dim=36,
-    #     dim_head = 8,
-    #     heads = 2,
-    #     depth = 2,
-    #     attend_self = True,
-    #     input_degrees = 1,
-    #     output_degrees = 2,
-    #     reduce_dim_out = False,
-    #     differentiable_coors = True,
-    #     num_neighbors = 0,
-    #     attend_sparse_neighbors = True,
-    #     num_adj_degrees = 2,
-    #     adj_dim = 4,
-    #     num_degrees=2,
+    # from scratch
+    # prot_bert = ProteinBERT(
+    #     num_tokens=22,
+    #     num_annotation=1, # We do not include the GO labels into the training.
+    #     dim=512,
+    #     dim_global=256,
+    #     depth=12,
+    #     narrow_conv_kernel=9,
+    #     wide_conv_kernel=9,
+    #     wide_conv_dilation=5,
+    #     attn_heads=8,
+    #     attn_dim_head=64,
     # )
         
-    se3_encoder = ProteinSE3Encoder(se3_model=se3, device=device, freeze_se3=args.load_pretrain)
-    model = CleaveSE3Model(se3_encoder=se3_encoder).to(rank)
+    bert_encoder = ProteinProtbertEncoder(bert_model=prot_bert, device=device, freeze_bert=args.load_pretrain)
+    model = CleaveProtbertModel(bert_encoder=bert_encoder).to(rank)
     model = FSDP(model,auto_wrap_policy=size_based_auto_wrap_policy,device_id=rank,sync_module_states=True,use_orig_params=True)
     
     for name, param in model.named_parameters():
@@ -357,7 +323,10 @@ def main():
 
     print(f"Test ROC-AUC: {rocauc:.4f}")
     print(f"Test AUPR:    {prauc:.4f}")
+    
+    dist.destroy_process_group()
 
 
 if __name__ == "__main__":
     main()
+    os.system("pkill -9 -f cle")
