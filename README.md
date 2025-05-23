@@ -17,9 +17,13 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 > - 🔵 `(#)` Uses publicly available pretrained weights  
 > - **AA Seq**: amino acid sequence  
 > - **3D Coord**: 3D coordinates of protein structures   
-> - **MLM**: masked language modeling  
-> - **MVCL**: multi-view contrastive learning  
-> - **PFP**: protein function prediction
+
+#### Illustration of pretraining strategy in Protap.
+![Illustration of pretraining tasks in Protap](/figures/pretrain_strategy.png) 
+(I) **Masked Language Modeling(MLM)** is a self-supervised objective designed to recover masked residues in protein sequences;  
+(II) **Multi-View Contrastive Learning(MVCL)** leverages protein structural information by aligning representations of biologically correlated substructures.  
+(III) **Protein Family Prediction(PFP)** introduces functional and structural supervision by training models to predict family labels based on protein sequences and 3D structures.
+
 
 ### Summary of Domain-Specific Models in Protap
 
