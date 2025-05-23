@@ -29,7 +29,7 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 | 🔴 `(*)` <br> **ProteinBERT**   | AA Seq           | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 72M  | MLM, MVCL, PFP | [Bioinformatics 2022](https://academic.oup.com/bioinformatics/article/38/8/2102/6502274) |
 | 🔴 `(*)` <br> **D-Transformer** | AA Seq &  3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 3.5M | MLM, MVCL, PFP | [ArXiv 2025](https://arxiv.org/abs/2502.06914), [ICLR 2023](https://openreview.net/forum?id=vZTp1oPV3PC) |
 | 🔵 `(#)` <br> **ESM2**          | AA Seq           | [UR50 70M](https://www.uniprot.org/help/uniref)                      | 650M | MLM           | [Science 2023](https://www.science.org/doi/10.1126/science.ade2574)         |  
-> - 🔴 `(*)` domain-specific models tailored for specific biological tasks, **For Domain-Specific Models, we provide github links.**
+> - 🔴 `(*)` Trained from scratch, **For models trained from scratch, we provide complete training code as well as downstream evaluation scripts.**
 > - 🔵 `(#)` Uses publicly available pretrained weights  
 > - **AA Seq**: amino acid sequence  
 > - **3D Coord**: 3D coordinates of protein structures   
