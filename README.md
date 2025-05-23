@@ -3,6 +3,8 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 
 
 ### Summary of Pretraining Models in Protap
+
+<div markdown="1">
 <small>
 
 | **Model** | **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** |
@@ -15,6 +17,7 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 | 🔵 `(#)` **ESM2** | AA Seq | [UR50 70M](https://www.uniprot.org/help/uniref) | 650M | MLM | [Science, 2023](https://www.science.org/doi/10.1126/science.ade2574) |
 
 </small>
+</div>
 
 > - 🔴 `(*)` Trained from scratch, **For models trained from scratch, we provide complete training code as well as downstream evaluation scripts.**
 > - 🔵 `(#)` Uses publicly available pretrained weights  
