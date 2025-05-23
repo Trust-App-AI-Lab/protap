@@ -4,8 +4,9 @@
 This project is the codebase for Protap, a comprehensive benchmark that systematically compares backbone architectures, pretraining strategies, and domain-specific models across diverse and realistic downstream protein applications.
 
 ### Summary of Pretraining Models in Protap
-|**Model** &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** |
-|----------|----------------------|-------------------|-------------|---------------|------------|
+
+|**Model** | **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** |
+|---------------------|----------------------|-------------------|-------------|---------------|------------|
 | 🔴 `(*)` **EGNN**          | AA Seq & 3D Coord  | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 10M  | MLM, MVCL, PFP | [ICML 2021](https://proceedings.mlr.press/v139/satorras21a.html)           |
 | 🔴 `(*)` **SE(3) Transformer** | AA Seq & 3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 4M   | MLM, MVCL, PFP | [NeurIPS 2020](https://proceedings.neurips.cc/paper/2020/hash/15231a7ce4ba789d13b722cc5c955834-Abstract.html) |
 | 🔴 `(*)` **GVP**           | AA Seq & 3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 0.2M | MLM, MVCL, PFP | [ICLR 2021](https://openreview.net/forum?id=1YLJDvSx6J4)                    |
