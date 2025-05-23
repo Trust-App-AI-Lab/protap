@@ -46,5 +46,10 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 > - **PLI**: Protein–Ligand Interactions  
 > - **AFP**: Protein Function Annotation Prediction
 
-
+## Environment requirements
+```
+python>=3.10
+pytorch>=2.4.1
+pytorch-cluster>=1.6.3
+```
 
