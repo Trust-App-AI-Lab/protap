@@ -12,15 +12,19 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 | 🔴 `(*)` <br> **GVP**           | AA Seq & 3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 0.2M | MLM, MVCL, PFP | [ICLR 2021](https://openreview.net/forum?id=1YLJDvSx6J4)                    |
 | 🔴 `(*)` <br> **ProteinBERT**   | AA Seq           | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 72M  | MLM, MVCL, PFP | [Bioinformatics 2022](https://academic.oup.com/bioinformatics/article/38/8/2102/6502274) |
 | 🔴 `(*)` <br> **D-Transformer** | AA Seq &  3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 3.5M | MLM, MVCL, PFP | [ArXiv 2025](https://arxiv.org/abs/2502.06914), [ICLR 2023](https://openreview.net/forum?id=vZTp1oPV3PC) |
-| 🔵 `(#)` <br> **ESM2**          | AA Seq           | [UR50 70M](https://www.uniprot.org/help/uniref)                      | 650M | MLM           | [Science 2023](https://www.science.org/doi/10.1126/science.ade2574)         |
-
+| 🔵 `(#)` <br> **ESM2**          | AA Seq           | [UR50 70M](https://www.uniprot.org/help/uniref)                      | 650M | MLM           | [Science 2023](https://www.science.org/doi/10.1126/science.ade2574)         |  
 > - 🔴 `(*)` domain-specific models tailored for specific biological tasks, **For Domain-Specific Models, we provide github links.**
-> - 🔵 `(#)` Uses publicly available pretrained weights  
+> - 🔵 `(#)` Uses publicly available pretrained weights
+<details>
+<summary><strong>Pretraining Models</strong></summary>  
+  
 > - **AA Seq**: amino acid sequence  
 > - **3D Coord**: 3D coordinates of protein structures   
 > - **MLM**: masked language modeling  
 > - **MVCL**: multi-view contrastive learning  
 > - **PFP**: protein function prediction
+
+</details>
 
 ### Summary of Domain-Specific Models in Protap
 
