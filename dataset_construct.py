@@ -622,7 +622,6 @@ if __name__ == '__main__':
     #         count_all_zero += 1
     #         print(data)
 
-    # print(f"GO全为0的样本数量: {count_all_zero}")
     
     # dataset = load_from_disk('./data/swiss-protein-540k-tensor')
     # print(len(dataset))
