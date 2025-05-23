@@ -3,7 +3,7 @@
 
 This project is the codebase for Protap, a comprehensive benchmark that systematically compares backbone architectures, pretraining strategies, and domain-specific models across diverse and realistic downstream protein applications.
 
-### Summary of Pretraining Models in Protap
+## Summary of Pretraining Models in Protap
 
 |**Model** | **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** |
 |:-------------:|----------------------|-------------------|-------------|---------------|------------|
@@ -18,22 +18,21 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 > - **AA Seq**: amino acid sequence  
 > - **3D Coord**: 3D coordinates of protein structures   
 
-### Illustration of pretraining strategy in Protap.
+## Illustration of pretraining strategy in Protap.
 ![Illustration of pretraining tasks in Protap](/figures/pretrain_strategy.png) 
-
 (I) **Masked Language Modeling(MLM)** is a self-supervised objective designed to recover masked residues in protein sequences;  
 (II) **Multi-View Contrastive Learning(MVCL)** leverages protein structural information by aligning representations of biologically correlated substructures.  
 (III) **Protein Family Prediction(PFP)** introduces functional and structural supervision by training models to predict family labels based on protein sequences and 3D structures.
 
 
-### Summary of Domain-Specific Models in Protap
+## Summary of Domain-Specific Models in Protap
 
 | **Model** | **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** | **Github** |
 |:----------:|----------------------|-------------------|-------------|---------------|------------|:--------:|
 | 🟤 `($)` <br> **ClipZyme**   | AA Seq & 3D Coord & SMILES | — | 14.8M | PFS | [ICML&nbsp;2024](https://openreview.net/forum?id=0mYAK6Yhhm) | [:octocat:](https://github.com/pgmikhael/clipzyme) |
 | 🟤 `($)` <br> **UniZyme**    | AA Seq & 3D Coord | [Swiss-Prot&nbsp;11k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 15.5M | PFS | [ArXiv&nbsp;2025](https://arxiv.org/abs/2502.06914) | [:octocat:](https://anonymous.4open.science/r/UniZyme-4A67) |
 | 🟤 `($)` <br> **DeepProtacs**| AA Seq & 3D Coord & SMILES | — | 0.1M | PROTACs | [Nat.&nbsp;Comm&nbsp;2022](https://www.nature.com/articles/s41467-022-34807-3) |  [:octocat:](https://github.com/Fenglei104/DeepPROTACs)|
-| 🟤 `($)` <br> **ETProtacs**  | AA Seq & 3D Coord & SMILES | — | 5.4M | PROTACs | [Brief&nbsp;Bioinf&nbsp;2025](https://academic.oup.com/bib/article/26/1/bbae654/7948073) |  [:octocat:](https://github.com/GuanyuYue/ET-PROTACs)|
+| 🟤 `($)` <br> **ET-Protacs**  | AA Seq & 3D Coord & SMILES | — | 5.4M | PROTACs | [Brief&nbsp;Bioinf&nbsp;2025](https://academic.oup.com/bib/article/26/1/bbae654/7948073) |  [:octocat:](https://github.com/GuanyuYue/ET-PROTACs)|
 | 🟤 `($)` <br> **KDBNet**     | AA Seq & 3D Coord & SMILES | — | 3.4M | PLI | [Nat.&nbsp;Mach.&nbsp;Intell&nbsp;2023](https://www.nature.com/articles/s42256-023-00751-0) |  [:octocat:](https://github.com/luoyunan/KDBNet) |
 | 🟤 `($)` <br> **MONN**       | AA Seq & 3D Coord | — | 1.7M | PLI | [Cell&nbsp;Systems&nbsp;2024](https://www.sciencedirect.com/science/article/pii/S2405471220300818) |  [:octocat:](https://github.com/lishuya17/MONN) |
 | 🟤 `($)` <br> **DeepFRI**    | AA Seq & 3D Coord | [Pfam&nbsp;10M](https://pfam.xfam.org/) | 1.8M | AFP | [Nat.&nbsp;Comm&nbsp;2021](https://www.nature.com/articles/s41467-021-23303-9) |  [:octocat:](https://github.com/flatironinstitute/DeepFRI) |
