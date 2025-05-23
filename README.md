@@ -14,7 +14,7 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 | 🔴 `(*)` **D-Transformer** | AA Seq & 3D Coord | [Swiss-Prot 540k](https://www.uniprot.org/uniprotkb?query=reviewed:true) | 3.5M | MLM, MVCL, PFP | [ArXiv, 2025](https://arxiv.org/abs/2502.06914), [ICLR, 2023](https://openreview.net/forum?id=vZTp1oPV3PC) |
 | 🔵 `(#)` **ESM2** | AA Seq | [UR50 70M](https://www.uniprot.org/help/uniref) | 650M | MLM | [Science, 2023](https://www.science.org/doi/10.1126/science.ade2574) |
 
-<small>
+</small>
 
 > - 🔴 `(*)` Trained from scratch, **For models trained from scratch, we provide complete training code as well as downstream evaluation scripts.**
 > - 🔵 `(#)` Uses publicly available pretrained weights  
@@ -39,7 +39,7 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 | 🟤 `($)` **DeepFRI** | AA Seq & 3D Coord | [Pfam 10M](https://pfam.xfam.org/) | 1.8M | AFP | [Nat. Comm., 2021](https://www.nature.com/articles/s41467-021-23303-9) |
 | 🟤 `($)` **DPFunc** | AA Seq & 3D Coord & Protein Domain | — | 110M | AFP | [Nat. Comm., 2025](https://www.nature.com/articles/s41467-024-54816-8) |
 
-<small>
+</small>
 
 > - 🟤 `($)` domain-specific models tailored for specific biological tasks, **For Domain-Specific Models, we provide github links.**
 > - **PFS**: enzyme-Catalyzed Protein Cleavage Site Prediction
