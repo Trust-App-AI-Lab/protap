@@ -1,1 +1,18 @@
-Please add the basic dependencies of the methods you implemented to this page.
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+transformers==4.45.2
+tokenizers==0.20.1
+scikit-learn==1.5.1
+scipy==1.14.1
+numpy==1.26.4
+pandas==2.2.2
+matplotlib==3.9.2
+biopython==1.84
+scanpy==1.10.2
+rdkit==2024.09.1
+e3nn==0.5.1
+pyg==2.6.1
+pyarrow==19.0.1
+h5py==3.11.0
+
