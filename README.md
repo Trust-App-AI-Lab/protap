@@ -4,6 +4,21 @@
 
 This project is the codebase for Protap, a comprehensive benchmark that systematically compares backbone architectures, pretraining strategies, and domain-specific models across diverse and realistic downstream protein applications.
 
+<details open><summary><b>Table of Contents</b></summary>
+
+- [Summary of Pretraining Models](#summary-of-pretraining-models-in-protap)
+- [Pretraining Strategy Illustration](#illustration-of-pretraining-strategy-in-protap)
+- [Summary of Domain-Specific Models](#summary-of-domain-specific-models-in-protap)
+- [Performance comparison across model architectures under different training strategies](#performance-comparison-across-model-architectures-under-different-training-strategies)
+- [Environment Installation](#environment-installation)
+- [Dataset](#dataset)
+- [Usage](#usage)
+  - [Pretrain](#pretrain)
+  - [Downstream Applications](#downstream-applications)
+
+</details>
+
+
 ## Summary of Pretraining Models in Protap
 
 |**Model** | **Input Modalities** | **Pretrain Data** | **#Params** | **Objective** | **Source** |
@@ -46,10 +61,80 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 > - **PLI**: Protein–Ligand Interactions  
 > - **AFP**: Protein Function Annotation Prediction
 
-## Environment requirements
+## Performance comparison across model architectures under different training strategies
+![Performance comparison across model architectures under different training strategies](/figures/Performance_comparison.png) 
+
+
+## Environment installation
 ```
-python>=3.10
-pytorch>=2.4.1
-pytorch-cluster>=1.6.3
+conda create -n protap python=3.12
+conda activate protap
+pip install -r requirements.txt
+```
+
+## Dataset
+The dataset used for downstream evaluation is available on Hugging Face: [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-orange?label=Protap%20Dataset)](https://huggingface.co/datasets/findshuo/Protap)
+
+You can also access it directly at:
+👉 **[https://huggingface.co/datasets/findshuo/Protap](https://huggingface.co/datasets/findshuo/Protap)**
+
+
+## Usage
+### Pretrain
+> To pretrain from scratch on the Swiss-Prot 540k dataset, simply execute the corresponding bash script for each model. The pretraining strategy and other parameters are customizable. An example of the bash script arguments is shown below:
+```bash
+torchrun --nproc_per_node=8  egnn_pretrain.py \
+    --model_name_or_path "protap/egnn" \
+    --data_path "./data/protein_family_2" \
+    --bf16 True \
+    --output_dir "./checkpoints/egnn/" \
+    --run_name 'egnn-pretrain-family-0419' \
+    --residue_prediction False \
+    --subseq_length 50 \
+    --max_nodes 50 \
+    --temperature 0.01 \
+    --task 'family_prediction' \
+    --num_train_epochs 70 \
+    --per_device_train_batch_size 48 \
+    --per_device_eval_batch_size 4 \
+    --evaluation_strategy "no" \
+    --save_strategy "steps" \
+    --save_steps 5000 \
+    --save_total_limit 1 \
+    --learning_rate 1e-3 \
+    --weight_decay 0. \
+    --warmup_ratio 0.05 \
+    --lr_scheduler_type "constant_with_warmup" \
+    --logging_steps 1 \
+    --fsdp no_shard \
+```
+
+### Downstream Applications
+> To evaluate pretrained models on various downstream tasks, please download the dataset from Hugging Face and run the corresponding bash script for each task. The dataset path, pretrained weights, and other parameters are customizable. An example of the bash script arguments is shown below:
+```bash
+torchrun --nproc_per_node=8 --master_port=23333 egnn_protac.py \
+    --model_name_or_path './checkpoints/egnn_contrastive.pt' \
+    --data_path "./data/protac_2" \
+    --bf16 True \
+    --output_dir "./checkpoints/egnn/" \
+    --run_name 'egnn-protac-cl-0428' \
+    --residue_prediction False \
+    --subseq_length 50 \
+    --max_nodes 50 \
+    --temperature 0.01 \
+    --num_train_epochs 50 \
+    --seed 1024 \
+    --load_pretrain True \
+    --per_device_train_batch_size 24 \
+    --per_device_eval_batch_size 4 \
+    --evaluation_strategy "no" \
+    --save_strategy "steps" \
+    --save_steps 5000 \
+    --save_total_limit 1 \
+    --learning_rate 5e-4 \
+    --weight_decay 0. \
+    --warmup_ratio 0.01 \
+    --lr_scheduler_type "constant_with_warmup" \
+    --logging_steps 1 \
 ```
 
