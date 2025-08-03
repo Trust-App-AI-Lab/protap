@@ -109,6 +109,40 @@ torchrun --nproc_per_node=8  egnn_pretrain.py \
     --fsdp no_shard \
 ```
 
+| Parameter                       | Description                                                         | Example Value                 |
+| ------------------------------- | ------------------------------------------------------------------- | ----------------------------- |
+| **Distributed & Hardware**      |                                                                     |                               |
+| `--nproc_per_node`              | Number of GPUs for `torchrun` per node                              | `8`                           |
+| `--fsdp`                        | FSDP sharding strategy: `no_shard`, `full_shard`, or `auto_wrap`    | `no_shard`                    |
+| **Model & Dataset**             |                                                                     |                               |
+| `--model_name_or_path`          | Hugging Face model name or local pretrained checkpoint              | `"protap/egnn"`               |
+| `--data_path`                   | Path to the pretraining dataset                                     | `"./data/protein_family_2"`   |
+| `--residue_prediction`          | Enable residue-level prediction (like MLM or site prediction)       | `False`                       |
+| `--task`                        | Pretraining task: `family_prediction`, `residue_prediction` or `MVCL`       | `'family_prediction'`         |
+| **Sequence & Graph Settings**   |                                                                     |                               |
+| `--subseq_length`               | Max subsequence length (number of residues per sample)              | `50`                          |
+| `--max_nodes`                   | Maximum number of graph nodes (residues)                            | `50`                          |
+| `--temperature`                 | Temperature for contrastive/probabilistic losses                    | `0.01`                        |
+| **Training Loop**               |                                                                     |                               |
+| `--num_train_epochs`            | Total number of training epochs                                     | `70`                          |
+| `--per_device_train_batch_size` | Training batch size per GPU                                         | `48`                          |
+| `--per_device_eval_batch_size`  | Evaluation batch size per GPU                                       | `4`                           |
+| `--learning_rate`               | Initial learning rate                                               | `1e-3`                        |
+| `--weight_decay`                | Weight decay (L2 regularization)                                    | `0.`                          |
+| `--warmup_ratio`                | Fraction of steps for LR warmup                                     | `0.05`                        |
+| `--lr_scheduler_type`           | LR schedule: `constant`, `linear`, `cosine`, `constant_with_warmup` | `"constant_with_warmup"`      |
+| **Evaluation & Logging**        |                                                                     |                               |
+| `--evaluation_strategy`         | When to run evaluation: `no`, `steps`, `epoch`                      | `"no"`                        |
+| `--logging_steps`               | Logging interval in steps                                           | `1`                           |
+| **Checkpointing**               |                                                                     |                               |
+| `--output_dir`                  | Directory to save checkpoints and weights                              | `"./checkpoints/egnn/"`       |
+| `--run_name`                    | Run name for wandb logging                                      | `'egnn-pretrain-family-0419'` |
+| `--save_strategy`               | When to save checkpoints: `steps` or `epoch`                        | `"steps"`                     |
+| `--save_steps`                  | Save checkpoint every N steps                                       | `5000`                        |
+| `--save_total_limit`            | Maximum number of checkpoints to keep (older deleted)               | `1`                           |
+| **Precision & Performance**     |                                                                     |                               |
+| `--bf16`                        | Enable bfloat16 mixed-precision training                            | `True`                        |
+
 ### Downstream Applications
 > To evaluate pretrained models on various downstream tasks, please download the dataset from Hugging Face and run the corresponding bash script for each task. The dataset path, pretrained weights, and other parameters are customizable. An example of the bash script arguments is shown below:
 ```bash
@@ -137,4 +171,15 @@ torchrun --nproc_per_node=8 --master_port=23333 egnn_protac.py \
     --lr_scheduler_type "constant_with_warmup" \
     --logging_steps 1 \
 ```
-
+| Parameter                       | Description                                                         | Example Value                         |
+| ------------------------------- | ------------------------------------------------------------------- | ------------------------------------- |
+| **Distributed & Hardware**      |                                                                     |                                       |
+| `--master_port`                 | TCP port for multi-GPU communication                                | `23333`                               |
+| **Model & Dataset**             |                                                                     |                                       |
+| `--load_pretrain`               | Whether to load pretrained weights for fine-tuning                  | `True`                                |
+| **Training Loop**               |                                                                     |                                       |
+| `--learning_rate`               | Typically smaller than in pretraining                               | `5e-4`                                |
+| `--num_train_epochs`            | Often fewer epochs than in pretraining                              | `50`                                  |
+| `--per_device_train_batch_size` | Often smaller than in pretraining                                   | `24`                                  |
+| **Evaluation & Logging**        |                                                                     |                                       |
+| `--seed`                        | Random seed for reproducibility                                     | `1024`                                |
