@@ -1,6 +1,5 @@
 
 # Protap: A Benchmark for Protein Modeling on Realistic Downstream Applications
-[![Datset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-orange?label=Dataset)]( )
 
 This project is the codebase for Protap, a comprehensive benchmark that systematically compares backbone architectures, pretraining strategies, and domain-specific models across diverse and realistic downstream protein applications.
 
