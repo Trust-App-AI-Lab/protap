@@ -129,7 +129,7 @@ def sample_substructure(data, radius=15.0):
 # -------------------------------------------------- loss (SimCLR)
 def info_nce(z, T=0.01):
     """
-    z: [2B, dim], (0,1) (2,3) … 为正对
+    z: [2B, dim], (0,1) (2,3) … are positive pairs
     """
     z = F.normalize(z, dim=-1)                  # cosine similarity
     sim = torch.matmul(z, z.T) / T              # [2B,2B]
