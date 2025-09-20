@@ -10,7 +10,6 @@ This project is the codebase for Protap, a comprehensive benchmark that systemat
 - [Summary of Domain-Specific Models](#summary-of-domain-specific-models-in-protap)
 - [Performance comparison across model architectures under different training strategies](#performance-comparison-across-model-architectures-under-different-training-strategies)
 - [Environment Installation](#environment-installation)
-- [Dataset](#dataset)
 - [Usage](#usage)
   - [Pretrain](#pretrain)
   - [Downstream Applications](#downstream-applications)
