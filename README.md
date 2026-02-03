@@ -70,13 +70,11 @@ conda activate protap
 pip install -r requirements.txt
 ```
 
-<!--
 ## Dataset
 The dataset used for downstream evaluation is available on Hugging Face: [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-orange?label=Protap%20Dataset)](https://huggingface.co/datasets/findshuo/Protap)
 
 You can also access it directly at:
 👉 **[https://huggingface.co/datasets/findshuo/Protap](https://huggingface.co/datasets/findshuo/Protap)**
--->
 
 
 ## Usage
